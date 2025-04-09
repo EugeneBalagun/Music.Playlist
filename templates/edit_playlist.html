@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Редактировать плейлист{% endblock %}
+{% block content %}
+    <h1>Редактировать плейлист</h1>
+    <form method="POST">
+        <div>
+            <label>Название плейлиста:</label><br>
+            <input type="text" name="playlist_name" value="{{ playlist.name }}" required>
+        </div>
+        <div>
+            <button type="submit">Сохранить</button>
+        </div>
+    </form>
+    <p><a href="{{ url_for('playlists_page') }}">Вернуться к плейлистам</a></p>
+{% endblock %}

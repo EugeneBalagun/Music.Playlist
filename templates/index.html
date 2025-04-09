@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Главная{% endblock %}
+{% block content %}
+    <h1>Добро пожаловать, {{ current_user.username }}!</h1>
+    
+    {% if not spotify_logged_in %}
+        <p><a href="{{ url_for('login_spotify') }}">Войти через Spotify</a></p>
+    {% else %}
+        <p>Вы вошли через Spotify. <a href="{{ url_for('logout_spotify') }}">Выйти из Spotify</a></p>
+    {% endif %}
+    
+    <h2>Ваши плейлисты</h2>
+    {% if playlists %}
+        <ul>
+            {% for playlist in playlists %}
+                <li>{{ playlist.name }} (Создан: {{ playlist.created_at.strftime('%Y-%m-%d') }})</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>У вас пока нет плейлистов.</p>
+    {% endif %}
+    
+    <p><a href="{{ url_for('add_playlist') }}">Добавить новый плейлист</a></p>
+    <p><a href="{{ url_for('playlists_page') }}">Управление плейлистами</a></p>
+{% endblock %}
