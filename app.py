@@ -150,7 +150,6 @@ def add_song_spotify(playlist_id):
         parsed_url = urlparse(song_url)
         track_id = parsed_url.path.split('/')[-1]
         track = sp.track(track_id)
-        audio_features = sp.audio_features([track_id])[0]
 
         new_song = Song(
             name=track['name'],
@@ -165,7 +164,6 @@ def add_song_spotify(playlist_id):
         logging.error(f"Ошибка: {e}")
         flash("Не удалось добавить песню.")
     return redirect(url_for('playlists_page'))
-
 
 @app.route('/playlists')
 @login_required
