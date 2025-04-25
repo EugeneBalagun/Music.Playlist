@@ -74,7 +74,7 @@ sp_oauth = SpotifyOAuth(
     client_id=app.config['SPOTIPY_CLIENT_ID'],
     client_secret=app.config['SPOTIPY_CLIENT_SECRET'],
     redirect_uri=app.config['SPOTIPY_REDIRECT_URI'],
-    scope='user-library-read user-read-private'
+    scope='user-library-read user-read-private playlist-read-private playlist-read-collaborative'
 )
 
 
@@ -113,18 +113,30 @@ def callback():
     return redirect(url_for('home'))
 
 
-
 def get_spotify_client():
-    token_info = sp_oauth.get_cached_token()
-    if not token_info:
-        if current_user.spotify_token:
-            try:
-                token_info = sp_oauth.refresh_access_token(current_user.spotify_token)
-            except Exception as e:
-                logging.error(f"Ошибка обновления токена: {e}")
-                return None
-    return spotipy.Spotify(auth=token_info['access_token']) if token_info else None
+    if not current_user.is_authenticated:
+        logging.debug("Пользователь не авторизован")
+        return None
 
+    token_info = sp_oauth.get_cached_token()
+    if token_info and not sp_oauth.is_token_expired(token_info):
+        logging.debug("Используем токен из кэша")
+        return spotipy.Spotify(auth=token_info['access_token'])
+
+    if current_user.spotify_token:
+        logging.debug(f"Токен из базы: {current_user.spotify_token}")
+        try:
+            token_info = sp_oauth.refresh_access_token(current_user.spotify_token)
+            current_user.spotify_token = token_info['access_token']
+            db.session.commit()
+            logging.debug("Токен успешно обновлён")
+            return spotipy.Spotify(auth=token_info['access_token'])
+        except Exception as e:
+            logging.error(f"Ошибка обновления токена: {e}")
+            return None
+
+    logging.debug("Токена нет, нужен логин в Spotify")
+    return None
 
 
 # Загрузка пользователя для Flask-Login
@@ -171,6 +183,8 @@ def playlists_page():
     # Отображаем только плейлисты текущего пользователя
     playlists = Playlist.query.filter_by(user_id=current_user.id).all()
     return render_template('playlists.html', playlists=playlists)
+
+
 
 @app.route('/add_note/<int:song_id>', methods=['POST'])
 @login_required
@@ -356,6 +370,81 @@ def rate_song(song_id):
     return redirect(url_for('playlists_page'))  # Возвращаем пользователя на страницу с плейлистами
 
 
+@app.route('/import_spotify_playlist', methods=['POST'])
+@login_required
+def import_spotify_playlist():
+    playlist_url = request.form.get('playlist_url')
+    logging.debug(f"Получена ссылка: {playlist_url}")
+    if not playlist_url:
+        flash("Будь ласка, введіть посилання на плейлист або альбом Spotify.")
+        return redirect(url_for('playlists_page'))
+
+    sp = get_spotify_client()
+    if not sp:
+        flash("Spotify клієнт не активний.")
+        return redirect(url_for('playlists_page'))
+
+    try:
+        # Разбираем URL
+        parsed_url = urlparse(playlist_url)
+        spotify_id = parsed_url.path.split('/')[-1].split('?')[0]
+        logging.debug(f"Извлечённый Spotify ID: {spotify_id}")
+
+        # Определяем тип контента
+        if '/playlist/' in parsed_url.path:
+            logging.debug("Обрабатываем плейлист")
+            data = sp.playlist(spotify_id)
+            tracks = data['tracks']['items']
+            source_type = "плейлиста"
+        elif '/album/' in parsed_url.path:
+            logging.debug("Обрабатываем альбом")
+            data = sp.album(spotify_id)
+            tracks = data['tracks']['items']
+            source_type = "альбома"
+        else:
+            flash("Невірне посилання. Використовуйте плейлист або альбом Spotify.")
+            return redirect(url_for('playlists_page'))
+
+        logging.debug(f"Отримали {source_type}: {data['name']}")
+
+        # Создаём новый плейлист в БД
+        new_playlist = Playlist(
+            name=data['name'],
+            user_id=current_user.id
+        )
+        db.session.add(new_playlist)
+        db.session.commit()
+        logging.debug(f"Створено плейлист: {new_playlist.name} (ID: {new_playlist.id})")
+
+        # Додаємо треки
+        added_count = 0
+        for item in tracks:
+            track = item['track'] if source_type == "плейлиста" else item
+            if not track or 'id' not in track:
+                logging.debug("Трек пропущено: немає ID")
+                continue
+
+            song = Song(
+                name=track['name'],
+                url=track['external_urls']['spotify'],
+                spotify_id=track['id'],
+                playlist_id=new_playlist.id
+            )
+            db.session.add(song)
+            added_count += 1
+            logging.debug(f"Додано трек: {track['name']}")
+
+        db.session.commit()
+        flash(f'Плейлист "{data["name"]}" успішно імпортовано з {added_count} піснями!')
+
+    except spotipy.SpotifyException as e:
+        logging.error(f"Помилка Spotify API: {e}")
+        flash(f"Помилка Spotify: {str(e)}")
+    except Exception as e:
+        logging.error(f"Помилка імпорту: {e}")
+        flash("Не вдалося імпортувати плейлист.")
+
+    return redirect(url_for('playlists_page'))
 
 
 

@@ -1,55 +1,69 @@
 {% extends "base.html" %}
-{% block title %}Мои плейлисты{% endblock %}
+{% block title %}Мої плейлисти{% endblock %}
 {% block content %}
-    <h1>Мои плейлисты</h1>
-    
-    <p><a href="{{ url_for('add_playlist') }}">Добавить новый плейлист</a></p>
-    
-    {% if playlists %}
-        {% for playlist in playlists %}
-            <details>
-                <summary>{{ playlist.name }} (Создан: {{ playlist.created_at.strftime('%Y-%m-%d') }})</summary>
-                <div>
-                    <form method="POST" action="{{ url_for('add_song_spotify', playlist_id=playlist.id) }}">
-                        <input type="text" name="song_url" placeholder="Ссылка на песню Spotify" required>
-                        <button type="submit">Добавить песню</button>
-                    </form>
-                    {% if playlist.songs %}
+<h1>Мої плейлисти</h1>
+
+<p><a href="{{ url_for('add_playlist') }}">Додати новий плейлист</a></p>
+
+<!-- Блок імпорту Spotify-плейлисту / альбому -->
+<h2>Імпортувати з Spotify</h2>
+<form method="POST" action="{{ url_for('import_spotify_playlist') }}">
+    <input type="text" name="playlist_url" placeholder="Посилання на плейлист або альбом Spotify" required>
+    <button type="submit">Імпортувати</button>
+</form>
+
+<hr>
+
+{% if playlists %}
+    {% for playlist in playlists %}
+        <details>
+            <summary>{{ playlist.name }} (Створено: {{ playlist.created_at.strftime('%Y-%m-%d') }})</summary>
+            <div>
+                <form method="POST" action="{{ url_for('add_song_spotify', playlist_id=playlist.id) }}">
+                    <input type="text" name="song_url" placeholder="Посилання на пісню Spotify" required>
+                    <button type="submit">Додати пісню</button>
+                </form>
+
+                {% if playlist.songs %}
+                    <ul>
                         {% for song in playlist.songs %}
-                            <details>
-                                <summary>{{ song.name }} (<a href="{{ song.url }}" target="_blank">Слушать</a>)</summary>
-                                <div>
-                                    <form method="POST" action="{{ url_for('rate_song', song_id=song.id) }}">
-                                        <label>Оценка (1-10):</label>
-                                        <input type="number" name="rating" min="1" max="10" value="{{ song.rating or '' }}">
-                                        <button type="submit">Оценить</button>
-                                    </form>
-                                    <form method="POST" action="{{ url_for('add_note', song_id=song.id) }}">
-                                        <label>Заметка:</label>
-                                        <input type="text" name="note" value="{{ song.notes or '' }}" placeholder="Заметка">
-                                        <button type="submit">Сохранить заметку</button>
-                                    </form>
-                                    <form method="POST" action="{{ url_for('delete_song', song_id=song.id) }}" style="display:inline;">
-                                        <button type="submit" onclick="return confirm('Вы уверены, что хотите удалить эту песню?');">Удалить песню</button>
-                                    </form>
-                                </div>
-                            </details>
+                            <li>
+                                <details>
+                                    <summary>{{ song.name }} (<a href="{{ song.url }}" target="_blank">Слухати</a>)</summary>
+                                    <div>
+                                        <form method="POST" action="{{ url_for('rate_song', song_id=song.id) }}">
+                                            <label>Оцінка (1-10):</label>
+                                            <input type="number" name="rating" min="1" max="10" value="{{ song.rating or '' }}">
+                                            <button type="submit">Оцінити</button>
+                                        </form>
+                                        <form method="POST" action="{{ url_for('add_note', song_id=song.id) }}">
+                                            <label>Нотатка:</label>
+                                            <input type="text" name="note" value="{{ song.notes or '' }}" placeholder="Нотатка">
+                                            <button type="submit">Зберегти</button>
+                                        </form>
+                                        <form method="POST" action="{{ url_for('delete_song', song_id=song.id) }}" style="display:inline;">
+                                            <button type="submit" onclick="return confirm('Ви впевнені, що хочете видалити цю пісню?');">Видалити пісню</button>
+                                        </form>
+                                    </div>
+                                </details>
+                            </li>
                         {% endfor %}
-                    {% else %}
-                        <p>В этом плейлисте пока нет песен.</p>
-                    {% endif %}
-                    <p>
-                        <a href="{{ url_for('edit_playlist', id=playlist.id) }}">Редактировать</a> |
-                        <form method="POST" action="{{ url_for('delete_playlist', playlist_id=playlist.id) }}" style="display:inline;">
-                            <button type="submit" onclick="return confirm('Вы уверены, что хотите удалить этот плейлист? Все песни в нём тоже будут удалены.');">Удалить плейлист</button>
-                        </form>
-                    </p>
-                </div>
-            </details>
-        {% endfor %}
-    {% else %}
-        <p>У вас пока нет плейлистов.</p>
-    {% endif %}
-    
-    <p><a href="{{ url_for('home') }}">На главную</a></p>
+                    </ul>
+                {% else %}
+                    <p>У цьому плейлисті поки немає пісень.</p>
+                {% endif %}
+                <p>
+                    <a href="{{ url_for('edit_playlist', id=playlist.id) }}">Редагувати</a> |
+                    <form method="POST" action="{{ url_for('delete_playlist', playlist_id=playlist.id) }}" style="display:inline;">
+                        <button type="submit" onclick="return confirm('Ви впевнені, що хочете видалити цей плейлист? Усі пісні також буде видалено.');">Видалити плейлист</button>
+                    </form>
+                </p>
+            </div>
+        </details>
+    {% endfor %}
+{% else %}
+    <p>У вас поки немає плейлистів.</p>
+{% endif %}
+
+<p><a href="{{ url_for('home') }}">На головну</a></p>
 {% endblock %}
