@@ -1,6 +1,6 @@
 import json
 import requests
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash
 from flask_bcrypt import Bcrypt
@@ -419,6 +419,35 @@ def import_spotify_playlist():
         flash("Не вдалося імпортувати плейлист.")
 
     return redirect(url_for('playlists_page'))
+
+@app.route('/api/songs/<int:playlist_id>', methods=['GET'])
+@login_required
+def get_songs_data(playlist_id):
+    playlist = Playlist.query.get_or_404(playlist_id)
+    if playlist.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    songs = Song.query.filter_by(playlist_id=playlist_id).all()
+    songs_data = [{
+        'name': song.name,
+        'popularity': song.popularity,
+        'duration_ms': song.duration_ms,
+        'explicit': song.explicit,
+        'release_date': song.release_date,
+        'genres': song.genres,
+        'rating': song.rating
+    } for song in songs]
+
+    return jsonify(songs_data)
+
+@app.route('/playlist/<int:playlist_id>/charts')
+@login_required
+def playlist_charts(playlist_id):
+    playlist = Playlist.query.get_or_404(playlist_id)
+    if playlist.user_id != current_user.id:
+        flash('Вы не можете просматривать графики этого плейлиста.')
+        return redirect(url_for('playlists_page'))
+    return render_template('charts.html', playlist=playlist)
 
 if __name__ == '__main__':
     with app.app_context():

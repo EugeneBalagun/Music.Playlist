@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}Графики для плейлиста {{ playlist.name }}{% endblock %}
+{% block content %}
+<h1>Графики для плейлиста: {{ playlist.name }}</h1>
+
+<p><a href="{{ url_for('playlists_page') }}">Вернуться к плейлистам</a></p>
+
+<div style="max-width: 800px; margin: 0 auto;">
+    <!-- Гистограмма популярности -->
+    <h2>Популярность песен</h2>
+    <canvas id="popularityChart"></canvas>
+
+    <!-- Круговая диаграмма жанров -->
+    <h2>Распределение жанров</h2>
+    <canvas id="genresChart"></canvas>
+
+    <!-- Линейный график длительности -->
+    <h2>Длительность песен</h2>
+    <canvas id="durationChart"></canvas>
+
+    <!-- Круговая диаграмма явного контента -->
+    <h2>Явный контент</h2>
+    <canvas id="explicitChart"></canvas>
+
+    <!-- Точечный график популярности vs рейтинга -->
+    <h2>Популярность vs Оценка</h2>
+    <canvas id="popularityVsRatingChart"></canvas>
+
+    <!-- Гистограмма годов выпуска -->
+    <h2>Годы выпуска песен</h2>
+    <canvas id="releaseYearChart"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    // Функция для генерации случайных цветов
+    function getRandomColors(count) {
+        const colors = [];
+        for (let i = 0; i < count; i++) {
+            const r = Math.floor(Math.random() * 255);
+            const g = Math.floor(Math.random() * 255);
+            const b = Math.floor(Math.random() * 255);
+            colors.push(`rgba(${r}, ${g}, ${b}, 0.5)`);
+            colors.push(`rgba(${r}, ${g}, ${b}, 1)`); // Для бордеров
+        }
+        return colors;
+    }
+
+    // Получение данных через API
+    fetch('/api/songs/{{ playlist.id }}')
+        .then(response => response.json())
+        .then(data => {
+            // Подготовка данных
+            const songs = data;
+            const songNames = songs.map(song => song.name);
+            const popularities = songs.map(song => song.popularity || 0);
+            const durations = songs.map(song => (song.duration_ms / 60000) || 0); // Перевод в минуты
+            const explicits = songs.map(song => song.explicit);
+            const ratings = songs.map(song => song.rating || 0);
+            const releaseYears = songs.map(song => song.release_date ? new Date(song.release_date).getFullYear() : null).filter(year => year);
+
+            // Подсчёт жанров
+            const genreCounts = {};
+            songs.forEach(song => {
+                if (song.genres) {
+                    song.genres.split(',').forEach(genre => {
+                        genre = genre.trim();
+                        genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+                    });
+                }
+            });
+            const genreLabels = Object.keys(genreCounts);
+            const genreData = Object.values(genreCounts);
+
+            // Подсчёт явного контента
+            const explicitCount = explicits.filter(e => e).length;
+            const nonExplicitCount = explicits.length - explicitCount;
+
+            // Подсчёт годов выпуска
+            const yearCounts = {};
+            releaseYears.forEach(year => {
+                yearCounts[year] = (yearCounts[year] || 0) + 1;
+            });
+            const yearLabels = Object.keys(yearCounts).sort();
+            const yearData = yearLabels.map(year => yearCounts[year]);
+
+            // Гистограмма популярности
+            new Chart(document.getElementById('popularityChart'), {
+                type: 'bar',
+                data: {
+                    labels: songNames,
+                    datasets: [{
+                        label: 'Популярность',
+                        data: popularities,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true, max: 100 }
+                    }
+                }
+            });
+
+            // Круговая диаграмма жанров
+            const genreColors = getRandomColors(genreLabels.length);
+            new Chart(document.getElementById('genresChart'), {
+                type: 'pie',
+                data: {
+                    labels: genreLabels,
+                    datasets: [{
+                        label: 'Жанры',
+                        data: genreData,
+                        backgroundColor: genreColors.filter((_, i) => i % 2 === 0),
+                        borderColor: genreColors.filter((_, i) => i % 2 === 1),
+                        borderWidth: 1
+                    }]
+                }
+            });
+
+            // Линейный график длительности
+            new Chart(document.getElementById('durationChart'), {
+                type: 'line',
+                data: {
+                    labels: songNames,
+                    datasets: [{
+                        label: 'Длительность (мин)',
+                        data: durations,
+                        fill: false,
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+
+            // Круговая диаграмма явного контента
+            new Chart(document.getElementById('explicitChart'), {
+                type: 'pie',
+                data: {
+                    labels: ['Явный контент', 'Без явного контента'],
+                    datasets: [{
+                        label: 'Явный контент',
+                        data: [explicitCount, nonExplicitCount],
+                        backgroundColor: ['rgba(255, 99, 132, 0.2)', 'rgba(54, 162, 235, 0.2)'],
+                        borderColor: ['rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)'],
+                        borderWidth: 1
+                    }]
+                }
+            });
+
+            // Точечный график популярности vs рейтинга
+            new Chart(document.getElementById('popularityVsRatingChart'), {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Популярность vs Оценка',
+                        data: songs.map(song => ({
+                            x: song.popularity || 0,
+                            y: song.rating || 0
+                        })),
+                        backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: { title: { display: true, text: 'Популярность' }, min: 0, max: 100 },
+                        y: { title: { display: true, text: 'Оценка' }, min: 0, max: 10 }
+                    }
+                }
+            });
+
+            // Гистограмма годов выпуска
+            new Chart(document.getElementById('releaseYearChart'), {
+                type: 'bar',
+                data: {
+                    labels: yearLabels,
+                    datasets: [{
+                        label: 'Количество песен',
+                        data: yearData,
+                        backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        })
+        .catch(error => console.error('Ошибка загрузки данных:', error));
+</script>
+
+{% endblock %}
