@@ -36,13 +36,16 @@ class Song(db.Model):
     explicit = db.Column(db.Boolean, nullable=True)
     release_date = db.Column(db.String(50), nullable=True)
     file_path = db.Column(db.String(255), nullable=True)
-    # Новые поля для анализа
     tempo = db.Column(db.Float, nullable=True)
     duration = db.Column(db.Float, nullable=True)
     spectral_centroid = db.Column(db.Float, nullable=True)
     onset_count = db.Column(db.Integer, nullable=True)
     analysis_report_path = db.Column(db.String(255), nullable=True)
     spectrogram_path = db.Column(db.String(255), nullable=True)
+    # Новые поля для питч-шифтинга
+    pitch_shifted_standard_path = db.Column(db.String(255), nullable=True)
+    pitch_shifted_custom_path = db.Column(db.String(255), nullable=True)
+    pitch_shift_results_path = db.Column(db.String(255), nullable=True)
 
     def __repr__(self):
         return f'<Song {self.name}>'

@@ -1,0 +1,45 @@
+<!-- templates/pitch_shift_results.html -->
+{% extends "base.html" %}
+{% block title %}Результаты питч-шифтинга: {{ song.name }}{% endblock %}
+{% block content %}
+<h1>Результаты питч-шифтинга: {{ song.name }}</h1>
+
+<h2>Обработанные треки</h2>
+{% if results %}
+    <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+        {% for result in results %}
+            <div style="flex: 1; min-width: 300px;">
+                <h3>{{ result.method }}</h3>
+                <p><a href="{{ url_for('serve_pitch_shift_file', filename=result.audio_path | basename) }}">Скачать трек</a></p>
+                <h4>Спектрограмма</h4>
+                <img src="{{ url_for('serve_pitch_shift_file', filename=result.spectrogram_path | basename) }}" alt="Спектрограмма {{ result.method }}" style="max-width: 100%;">
+                {% if metrics[result.method] %}
+                    <p><strong>Корреляция MFCC с оригиналом:</strong> {{ metrics[result.method].mfcc_correlation | round(4) }}</p>
+                    <p><strong>Разница в спектральном центроиде:</strong> {{ metrics[result.method].spectral_centroid_diff | round(2) }} Гц</p>
+                    <p><strong>Разница в RMS:</strong> {{ metrics[result.method].rms_diff | round(4) }}</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <h2>Сравнение методов</h2>
+    {% if metrics.Standard and metrics.Custom %}
+        <p><strong>Разница в корреляции MFCC (Стандартный vs Ваш):</strong> {{ (metrics.Standard.mfcc_correlation - metrics.Custom.mfcc_correlation) | abs | round(6) }}</p>
+        <p><strong>Разница в спектральном центроиде (Стандартный vs Ваш):</strong> {{ (metrics.Standard.spectral_centroid_diff - metrics.Custom.spectral_centroid_diff) | abs | round(2) }} Гц</p>
+        <p><strong>Разница в RMS (Стандартный vs Ваш):</strong> {{ (metrics.Standard.rms_diff - metrics.Custom.rms_diff) | abs | round(4) }}</p>
+    {% else %}
+        <p>Для сравнения выполните питч-шифтинг обоими методами.</p>
+    {% endif %}
+{% else %}
+    <p>Результаты отсутствуют. Выполните питч-шифтинг заново.</p>
+{% endif %}
+
+<p><a href="{{ url_for('playlists_page') }}">Вернуться к плейлистам</a></p>
+
+<style>
+    pre { background-color: #f8f8f8; padding: 10px; border-radius: 5px; }
+    img { margin: 10px 0; border: 1px solid #ddd; max-width: 100%; }
+    h1, h2, h3 { color: #333; }
+    div { border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+</style>
+{% endblock %}

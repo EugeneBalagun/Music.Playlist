@@ -21,6 +21,8 @@ from datetime import datetime
 from flask import send_file
 from markupsafe import Markup
 from os.path import basename
+import soundfile as sf
+import scipy.signal
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -61,6 +63,16 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 # Создаём директорию для хранения результатов анализа
 ANALYSIS_DIR = os.path.join(os.getcwd(), 'analysis')
 os.makedirs(ANALYSIS_DIR, exist_ok=True)
+
+PITCH_SHIFT_DIR = os.path.join(os.getcwd(), 'pitch_shifted')
+os.makedirs(PITCH_SHIFT_DIR, exist_ok=True)
+
+# Параметры для вашего метода
+K_CUSTOM = 22885686008
+N_CUSTOM = 39123338641
+K_STANDARD = 7
+N_STANDARD = 12
+
 
 # Функция для получения жанров из Last.fm
 def get_genre_from_lastfm(track_name, artist_name):
@@ -545,39 +557,26 @@ def analyze_song(song_id):
         flash(f'Не удалось проанализировать песню: {str(e)}')
         return redirect(url_for('playlists_page'))
 
+# Функция анализа песни
 def analyze_song(file_path, song):
     try:
-        # Загружаем аудиофайл
         y, sr = librosa.load(file_path, sr=None)
         duration = librosa.get_duration(y=y, sr=sr)
-
-        # 1. Темп (BPM) и удары
         tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
         tempo = float(tempo)
         beat_times = librosa.frames_to_time(beat_frames, sr=sr).tolist()
-
-        # 2. Спектральные характеристики
         spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr).mean()
         spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr).mean()
         spectral_bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr).mean()
-
-        # 3. MFCC
         mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
         mfcc_mean = mfcc.mean(axis=1).tolist()
-
-        # 4. Хромаграмма
         chroma = librosa.feature.chroma_stft(y=y, sr=sr)
         chroma_mean = chroma.mean(axis=1).tolist()
-
-        # 5. Пиковые точки (onsets)
         onsets = librosa.onset.onset_detect(y=y, sr=sr, units='time')
         onset_count = len(onsets)
         onset_times = onsets.tolist()
-
-        # 6. Энергия (RMS)
         rms = librosa.feature.rms(y=y).mean()
 
-        # 7. Спектрограмма
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         spectrogram_path = os.path.join(ANALYSIS_DIR, f'spectrogram_{song.id}_{timestamp}.png')
         plt.figure(figsize=(10, 4))
@@ -588,7 +587,6 @@ def analyze_song(file_path, song):
         plt.savefig(spectrogram_path)
         plt.close()
 
-        # 8. Хромаграмма
         chromagram_path = os.path.join(ANALYSIS_DIR, f'chromagram_{song.id}_{timestamp}.png')
         plt.figure(figsize=(10, 4))
         librosa.display.specshow(chroma, y_axis='chroma', x_axis='time', sr=sr)
@@ -597,7 +595,6 @@ def analyze_song(file_path, song):
         plt.savefig(chromagram_path)
         plt.close()
 
-        # 9. Текстовый отчёт
         report_path = os.path.join(ANALYSIS_DIR, f'report_{song.id}_{timestamp}.txt')
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(f"Анализ аудиофайла: {os.path.basename(file_path)}\n")
@@ -616,7 +613,6 @@ def analyze_song(file_path, song):
             f.write(f"Путь к спектрограмме: {spectrogram_path}\n")
             f.write(f"Путь к хромаграмме: {chromagram_path}\n")
 
-        # Сохранение результатов в модель Song
         song.tempo = tempo
         song.duration = duration
         song.spectral_centroid = spectral_centroid
@@ -625,7 +621,6 @@ def analyze_song(file_path, song):
         song.spectrogram_path = spectrogram_path
         db.session.commit()
 
-        # Краткий результат для flash-сообщения
         summary = (
             f"Темп: {tempo:.2f} BPM, "
             f"Длительность: {duration:.2f} сек, "
@@ -678,6 +673,232 @@ def serve_analysis_file(filename):
         return send_file(file_path)
     flash('Файл анализа не найден.')
     return redirect(url_for('playlists_page'))
+
+# Функция для питч-шифтинга
+def pitch_shift_song(file_path, song, semitones, method='standard'):
+    try:
+        # Загружаем аудиофайл
+        y, sr = librosa.load(file_path, sr=44100)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        # Выбираем параметры метода
+        if method == 'standard':
+            K = K_STANDARD
+            N = N_STANDARD
+            output_prefix = f'standard_{song.id}_{semitones}_{timestamp}'
+            pitch_steps = semitones
+        else:
+            K = K_CUSTOM
+            N = N_CUSTOM
+            output_prefix = f'custom_{song.id}_{semitones}_{timestamp}'
+            pitch_steps = semitones * K / 7 / N
+
+        # Питч-шифтинг
+        y_shifted = librosa.effects.pitch_shift(y, sr=sr, n_steps=pitch_steps)
+
+        # Сохраняем результат
+        output_path = os.path.join(PITCH_SHIFT_DIR, f'{output_prefix}.mp3')
+        sf.write(output_path, y_shifted, sr)
+        logging.debug(f"Saved pitch-shifted file: {output_path}, exists: {os.path.exists(output_path)}")
+
+        # Спектрограмма
+        spectrogram_path = os.path.join(PITCH_SHIFT_DIR, f'spectrogram_{output_prefix}.png')
+        plt.figure(figsize=(10, 4))
+        librosa.display.specshow(librosa.amplitude_to_db(np.abs(librosa.stft(y_shifted)), ref=np.max),
+                                 sr=sr, x_axis='time', y_axis='log')
+        plt.colorbar(format='%+2.0f dB')
+        plt.title(f'Spectrogram: {song.name} ({method}, {semitones} semitones)')
+        plt.savefig(spectrogram_path)
+        plt.close()
+        logging.debug(f"Saved spectrogram: {spectrogram_path}, exists: {os.path.exists(spectrogram_path)}")
+
+        # Проверка существования файлов
+        if not os.path.exists(output_path):
+            raise FileNotFoundError(f"Аудиофайл не сохранён: {output_path}")
+        if not os.path.exists(spectrogram_path):
+            raise FileNotFoundError(f"Спектрограмма не сохранена: {spectrogram_path}")
+
+        return {
+            'output_path': output_path,
+            'spectrogram_path': spectrogram_path
+        }
+
+    except Exception as e:
+        logging.error(f"Ошибка питч-шифтинга ({method}): {e}")
+        raise
+
+# Маршрут для питч-шифтинга
+@app.route('/pitch_shift/<int:song_id>', methods=['POST'])
+@login_required
+def pitch_shift(song_id):
+    song = Song.query.get_or_404(song_id)
+    if not song.file_path:
+        flash('Песня не скачана.')
+        return redirect(url_for('playlists_page'))
+
+    semitones = request.form.get('semitones')
+
+    try:
+        semitones = float(semitones)
+
+        # Выполняем питч-шифтинг для обоих методов
+        success = True
+        if not (song.pitch_shifted_standard_path and os.path.exists(song.pitch_shifted_standard_path)):
+            result_standard = pitch_shift_song(song.file_path, song, semitones, 'standard')
+            song.pitch_shifted_standard_path = result_standard['output_path']
+        else:
+            logging.debug(f"Standard pitch-shift already exists: {song.pitch_shifted_standard_path}")
+
+        if not (song.pitch_shifted_custom_path and os.path.exists(song.pitch_shifted_custom_path)):
+            result_custom = pitch_shift_song(song.file_path, song, semitones, 'custom')
+            song.pitch_shifted_custom_path = result_custom['output_path']
+        else:
+            logging.debug(f"Custom pitch-shift already exists: {song.pitch_shifted_custom_path}")
+
+        # Проверяем, что оба результата существуют
+        if not (os.path.exists(song.pitch_shifted_standard_path) and os.path.exists(song.pitch_shifted_custom_path)):
+            success = False
+            flash('Ошибка: Не удалось сохранить результаты питч-шифтинга.')
+            logging.error(f"Missing files: standard={song.pitch_shifted_standard_path}, custom={song.pitch_shifted_custom_path}")
+        else:
+            db.session.commit()
+            flash(f'Питч-шифтинг песни "{song.name}" успешно выполнен для обоих методов.')
+
+        # Перенаправляем на страницу сравнения
+        if success:
+            return redirect(url_for('pitch_shift_compare', song_id=song.id))
+        else:
+            return redirect(url_for('playlists_page'))
+
+    except Exception as e:
+        logging.error(f"Ошибка питч-шифтинга: {e}")
+        flash(f'Не удалось выполнить питч-шифтинг: {str(e)}')
+        return redirect(url_for('playlists_page'))
+
+# Маршрут для сравнения результатов питч-шифтинга
+@app.route('/pitch_shift_compare/<int:song_id>')
+@login_required
+def pitch_shift_compare(song_id):
+    song = Song.query.get_or_404(song_id)
+    if song.playlist.user_id != current_user.id:
+        flash('Вы не можете просматривать результаты этой песни.')
+        return redirect(url_for('playlists_page'))
+
+    # Собираем данные для отображения
+    results = []
+    # Оригинальный трек
+    if song.file_path and song.spectrogram_path and os.path.exists(song.spectrogram_path):
+        results.append({
+            'method': 'Original',
+            'audio_path': song.file_path,
+            'spectrogram_path': song.spectrogram_path
+        })
+    else:
+        logging.debug(f"Original file or spectrogram missing: file={song.file_path}, spectrogram={song.spectrogram_path}")
+
+    # Стандартный метод
+    if song.pitch_shifted_standard_path and os.path.exists(song.pitch_shifted_standard_path):
+        standard_spectrogram = os.path.join(PITCH_SHIFT_DIR, f'spectrogram_{os.path.basename(song.pitch_shifted_standard_path).replace(".mp3", ".png")}')
+        if not os.path.exists(standard_spectrogram) and os.path.exists(song.pitch_shifted_standard_path):
+            # Пересоздаём спектрограмму, если она отсутствует
+            try:
+                y_shifted, sr = librosa.load(song.pitch_shifted_standard_path, sr=44100)
+                plt.figure(figsize=(10, 4))
+                librosa.display.specshow(librosa.amplitude_to_db(np.abs(librosa.stft(y_shifted)), ref=np.max),
+                                         sr=sr, x_axis='time', y_axis='log')
+                plt.colorbar(format='%+2.0f dB')
+                plt.title(f'Spectrogram: {song.name} (Standard)')
+                plt.savefig(standard_spectrogram)
+                plt.close()
+                logging.debug(f"Recreated spectrogram: {standard_spectrogram}")
+            except Exception as e:
+                logging.error(f"Ошибка пересоздания спектрограммы (Standard): {e}")
+        if os.path.exists(standard_spectrogram):
+            results.append({
+                'method': 'Standard',
+                'audio_path': song.pitch_shifted_standard_path,
+                'spectrogram_path': standard_spectrogram
+            })
+        else:
+            logging.warning(f"Standard spectrogram still missing: {standard_spectrogram}")
+
+    # Ваш метод
+    if song.pitch_shifted_custom_path and os.path.exists(song.pitch_shifted_custom_path):
+        custom_spectrogram = os.path.join(PITCH_SHIFT_DIR, f'spectrogram_{os.path.basename(song.pitch_shifted_custom_path).replace(".mp3", ".png")}')
+        if not os.path.exists(custom_spectrogram) and os.path.exists(song.pitch_shifted_custom_path):
+            # Пересоздаём спектрограмму, если она отсутствует
+            try:
+                y_shifted, sr = librosa.load(song.pitch_shifted_custom_path, sr=44100)
+                plt.figure(figsize=(10, 4))
+                librosa.display.specshow(librosa.amplitude_to_db(np.abs(librosa.stft(y_shifted)), ref=np.max),
+                                         sr=sr, x_axis='time', y_axis='log')
+                plt.colorbar(format='%+2.0f dB')
+                plt.title(f'Spectrogram: {song.name} (Custom)')
+                plt.savefig(custom_spectrogram)
+                plt.close()
+                logging.debug(f"Recreated spectrogram: {custom_spectrogram}")
+            except Exception as e:
+                logging.error(f"Ошибка пересоздания спектрограммы (Custom): {e}")
+        if os.path.exists(custom_spectrogram):
+            results.append({
+                'method': 'Custom',
+                'audio_path': song.pitch_shifted_custom_path,
+                'spectrogram_path': custom_spectrogram
+            })
+        else:
+            logging.warning(f"Custom spectrogram still missing: {custom_spectrogram}")
+
+    # Метрики
+    metrics = {}
+    if results:
+        y_orig, sr = librosa.load(song.file_path, sr=44100)
+        mfcc_orig = librosa.feature.mfcc(y=y_orig, sr=sr, n_mfcc=13).mean(axis=1)
+        spectral_centroid_orig = librosa.feature.spectral_centroid(y=y_orig, sr=sr).mean()
+        rms_orig = librosa.feature.rms(y=y_orig).mean()
+
+        for result in results:
+            if result['method'] == 'Original':
+                metrics['Original'] = {
+                    'mfcc_correlation': 1.0,
+                    'spectral_centroid': spectral_centroid_orig,
+                    'rms': rms_orig
+                }
+                continue
+            try:
+                y_shifted, _ = librosa.load(result['audio_path'], sr=44100)
+                mfcc_shifted = librosa.feature.mfcc(y=y_shifted, sr=sr, n_mfcc=13).mean(axis=1)
+                spectral_centroid_shifted = librosa.feature.spectral_centroid(y=y_shifted, sr=sr).mean()
+                rms_shifted = librosa.feature.rms(y=y_shifted).mean()
+                correlation = np.corrcoef(mfcc_orig, mfcc_shifted)[0, 1]
+                metrics[result['method']] = {
+                    'mfcc_correlation': correlation,
+                    'spectral_centroid_diff': abs(spectral_centroid_orig - spectral_centroid_shifted),
+                    'rms_diff': abs(rms_orig - rms_shifted)
+                }
+            except Exception as e:
+                logging.error(f"Ошибка вычисления метрик для {result['method']}: {e}")
+                metrics[result['method']] = {
+                    'mfcc_correlation': 'Ошибка',
+                    'spectral_centroid_diff': 'Ошибка',
+                    'rms_diff': 'Ошибка'
+                }
+
+    logging.debug(f"Compare results: {results}")
+    if not results:
+        flash('Результаты питч-шифтинга отсутствуют. Выполните питч-шифтинг.')
+
+    return render_template('pitch_shift_compare.html', song=song, results=results, metrics=metrics)
+
+# Маршрут для отдачи файлов
+@app.route('/pitch_shift_file/<filename>')
+@login_required
+def serve_pitch_shift_file(filename):
+    file_path = os.path.join(PITCH_SHIFT_DIR, filename)
+    if os.path.exists(file_path):
+        return send_file(file_path)
+    flash('Файл не найден.')
+    return redirect(url_for('playlists_page'))
+
 
 if __name__ == '__main__':
     with app.app_context():

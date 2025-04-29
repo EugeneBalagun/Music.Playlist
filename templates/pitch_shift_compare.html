@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Порівняння питч-шифтингу: {{ song.name }}{% endblock %}
+{% block content %}
+<h1>Порівняння питч-шифтингу: {{ song.name }}</h1>
+
+<h2>Оброблені треки</h2>
+{% if results %}
+    <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+        {% for result in results %}
+            <div style="flex: 1; min-width: 300px;">
+                <h3>{{ result.method }}</h3>
+                <audio controls>
+                    <source src="{{ url_for('serve_pitch_shift_file', filename=result.audio_path | basename) }}" type="audio/mpeg">
+                    Ваш браузер не підтримує елемент audio.
+                </audio>
+                <p><a href="{{ url_for('serve_pitch_shift_file', filename=result.audio_path | basename) }}">Завантажити трек</a></p>
+                <h4>Спектрограма</h4>
+                <img src="{{ url_for('serve_pitch_shift_file', filename=result.spectrogram_path | basename) }}" alt="Спектрограма {{ result.method }}" style="max-width: 100%;">
+                {% if metrics[result.method] %}
+                    <p><strong>Кореляція MFCC з оригіналом:</strong> {{ metrics[result.method].mfcc_correlation | round(4) }}</p>
+                    {% if result.method != 'Original' %}
+                        <p><strong>Різниця в спектральному центроїді:</strong> {{ metrics[result.method].spectral_centroid_diff | round(2) }} Гц</p>
+                        <p><strong>Різниця в RMS:</strong> {{ metrics[result.method].rms_diff | round(4) }}</p>
+                    {% else %}
+                        <p><strong>Спектральний центроїд:</strong> {{ metrics[result.method].spectral_centroid | round(2) }} Гц</p>
+                        <p><strong>RMS:</strong> {{ metrics[result.method].rms | round(4) }}</p>
+                    {% endif %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <h2>Порівняння методів</h2>
+    {% if metrics.Standard and metrics.Custom %}
+        <p><strong>Різниця в кореляції MFCC (Стандартний vs Ваш):</strong> {{ (metrics.Standard.mfcc_correlation - metrics.Custom.mfcc_correlation) | abs | round(6) }}</p>
+        <p><strong>Різниця в спектральному центроїді (Стандартний vs Ваш):</strong> {{ (metrics.Standard.spectral_centroid_diff - metrics.Custom.spectral_centroid_diff) | abs | round(2) }} Гц</p>
+        <p><strong>Різниця в RMS (Стандартний vs Ваш):</strong> {{ (metrics.Standard.rms_diff - metrics.Custom.rms_diff) | abs | round(4) }}</p>
+    {% else %}
+        <p>Для порівняння виконайте питч-шифтинг обома методами.</p>
+    {% endif %}
+{% else %}
+    <p>Результати питч-шифтингу відсутні. Виконайте питч-шифтинг.</p>
+{% endif %}
+
+<p><a href="{{ url_for('playlists_page') }}">Повернутися до плейлистів</a></p>
+
+<style>
+    pre { background-color: #f8f8f8; padding: 10px; border-radius: 5px; }
+    img { margin: 10px 0; border: 1px solid #ddd; max-width: 100%; }
+    h1, h2, h3 { color: #333; }
+    div { border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+    audio { width: 100%; margin: 10px 0; }
+</style>
+{% endblock %}
