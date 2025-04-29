@@ -1,3 +1,4 @@
+# database.py
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from datetime import datetime
@@ -30,10 +31,18 @@ class Song(db.Model):
     rating = db.Column(db.Integer, nullable=True)
     notes = db.Column(db.Text, nullable=True)
     genres = db.Column(db.String(255), nullable=True)
-    popularity = db.Column(db.Integer, nullable=True)  # Популярность (0–100)
-    duration_ms = db.Column(db.Integer, nullable=True)  # Длительность в миллисекундах
-    explicit = db.Column(db.Boolean, nullable=True)  # Явный контент
-    release_date = db.Column(db.String(50), nullable=True)  # Дата выпуска
+    popularity = db.Column(db.Integer, nullable=True)
+    duration_ms = db.Column(db.Integer, nullable=True)
+    explicit = db.Column(db.Boolean, nullable=True)
+    release_date = db.Column(db.String(50), nullable=True)
+    file_path = db.Column(db.String(255), nullable=True)
+    # Новые поля для анализа
+    tempo = db.Column(db.Float, nullable=True)
+    duration = db.Column(db.Float, nullable=True)
+    spectral_centroid = db.Column(db.Float, nullable=True)
+    onset_count = db.Column(db.Integer, nullable=True)
+    analysis_report_path = db.Column(db.String(255), nullable=True)
+    spectrogram_path = db.Column(db.String(255), nullable=True)
 
     def __repr__(self):
         return f'<Song {self.name}>'

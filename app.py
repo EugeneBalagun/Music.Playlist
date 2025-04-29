@@ -10,6 +10,17 @@ from spotipy.oauth2 import SpotifyOAuth
 from urllib.parse import urlparse
 import logging
 from database import db, User, Playlist, Song
+import os
+from spotdl import Spotdl
+import librosa
+import librosa.display
+import yt_dlp
+import numpy as np
+import matplotlib.pyplot as plt
+from datetime import datetime
+from flask import send_file
+from markupsafe import Markup
+from os.path import basename
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -29,6 +40,9 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 migrate = Migrate(app, db)
 
+# Фильтр для Jinja
+app.jinja_env.filters['basename'] = basename
+
 with app.app_context():
     db.create_all()  # Создаём таблицы при запуске приложения
 
@@ -39,6 +53,14 @@ sp_oauth = SpotifyOAuth(
     redirect_uri=app.config['SPOTIPY_REDIRECT_URI'],
     scope='user-library-read user-read-private playlist-read-private playlist-read-collaborative'
 )
+
+# Создаём директорию для хранения скачанных файлов
+DOWNLOAD_DIR = os.path.join(os.getcwd(), 'downloads')
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+# Создаём директорию для хранения результатов анализа
+ANALYSIS_DIR = os.path.join(os.getcwd(), 'analysis')
+os.makedirs(ANALYSIS_DIR, exist_ok=True)
 
 # Функция для получения жанров из Last.fm
 def get_genre_from_lastfm(track_name, artist_name):
@@ -448,6 +470,214 @@ def playlist_charts(playlist_id):
         flash('Вы не можете просматривать графики этого плейлиста.')
         return redirect(url_for('playlists_page'))
     return render_template('charts.html', playlist=playlist)
+
+@app.route('/download_song/<int:song_id>', methods=['POST'])
+@login_required
+def download_song(song_id):
+    song = Song.query.get_or_404(song_id)
+    if song.playlist.user_id != current_user.id:
+        flash('Вы не можете скачать эту песню.')
+        return redirect(url_for('playlists_page'))
+
+    sp = get_spotify_client()
+    if not sp:
+        return redirect(url_for('login_spotify'))
+
+    try:
+        # Получаем метаданные трека
+        track = sp.track(song.spotify_id)
+        track_name = track['name']
+        artist_name = track['artists'][0]['name']
+        query = f"{track_name} {artist_name}"
+
+        # Настройки для yt-dlp
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': os.path.join(DOWNLOAD_DIR, f"{track_name} - {artist_name}.%(ext)s"),
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'quiet': True,
+            'no_warnings': True,
+        }
+
+        # Скачивание с YouTube
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([f"ytsearch:{query}"])
+
+        # Проверяем, был ли файл успешно скачан
+        file_path = os.path.join(DOWNLOAD_DIR, f"{track_name} - {artist_name}.mp3")
+        if os.path.exists(file_path):
+            song.file_path = file_path
+            db.session.commit()
+            flash(f'Песня "{track_name}" успешно скачана и сохранена!')
+        else:
+            flash(f'Не удалось скачать песню "{track_name}".')
+            logging.error(f"Файл не найден после скачивания: {file_path}")
+
+    except Exception as e:
+        logging.error(f"Ошибка при скачивании: {e}")
+        flash(f'Не удалось скачать песню: {str(e)}')
+
+    return redirect(url_for('playlists_page'))
+
+@app.route('/analyze_song/<int:song_id>', methods=['POST'])
+@login_required
+def analyze_song(song_id):
+    song = Song.query.get_or_404(song_id)
+    if not song.file_path:
+        flash('Песня не скачана.')
+        return redirect(url_for('playlists_page'))
+
+    # Проверяем, есть ли кэшированные результаты анализа
+    if song.analysis_report_path and os.path.exists(song.analysis_report_path):
+        flash(f'Анализ для песни "{song.name}" уже выполнен.')
+        return redirect(url_for('view_analysis', song_id=song.id))
+
+    try:
+        analysis = analyze_song(song.file_path, song)
+        flash(f'Анализ песни "{song.name}" успешно выполнен.')
+        return redirect(url_for('view_analysis', song_id=song.id))
+    except Exception as e:
+        logging.error(f"Ошибка анализа: {e}")
+        flash(f'Не удалось проанализировать песню: {str(e)}')
+        return redirect(url_for('playlists_page'))
+
+def analyze_song(file_path, song):
+    try:
+        # Загружаем аудиофайл
+        y, sr = librosa.load(file_path, sr=None)
+        duration = librosa.get_duration(y=y, sr=sr)
+
+        # 1. Темп (BPM) и удары
+        tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+        tempo = float(tempo)
+        beat_times = librosa.frames_to_time(beat_frames, sr=sr).tolist()
+
+        # 2. Спектральные характеристики
+        spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr).mean()
+        spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr).mean()
+        spectral_bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr).mean()
+
+        # 3. MFCC
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+        mfcc_mean = mfcc.mean(axis=1).tolist()
+
+        # 4. Хромаграмма
+        chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+        chroma_mean = chroma.mean(axis=1).tolist()
+
+        # 5. Пиковые точки (onsets)
+        onsets = librosa.onset.onset_detect(y=y, sr=sr, units='time')
+        onset_count = len(onsets)
+        onset_times = onsets.tolist()
+
+        # 6. Энергия (RMS)
+        rms = librosa.feature.rms(y=y).mean()
+
+        # 7. Спектрограмма
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        spectrogram_path = os.path.join(ANALYSIS_DIR, f'spectrogram_{song.id}_{timestamp}.png')
+        plt.figure(figsize=(10, 4))
+        librosa.display.specshow(librosa.amplitude_to_db(np.abs(librosa.stft(y)), ref=np.max),
+                                 sr=sr, x_axis='time', y_axis='log')
+        plt.colorbar(format='%+2.0f dB')
+        plt.title(f'Spectrogram: {song.name}')
+        plt.savefig(spectrogram_path)
+        plt.close()
+
+        # 8. Хромаграмма
+        chromagram_path = os.path.join(ANALYSIS_DIR, f'chromagram_{song.id}_{timestamp}.png')
+        plt.figure(figsize=(10, 4))
+        librosa.display.specshow(chroma, y_axis='chroma', x_axis='time', sr=sr)
+        plt.colorbar()
+        plt.title(f'Chromagram: {song.name}')
+        plt.savefig(chromagram_path)
+        plt.close()
+
+        # 9. Текстовый отчёт
+        report_path = os.path.join(ANALYSIS_DIR, f'report_{song.id}_{timestamp}.txt')
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write(f"Анализ аудиофайла: {os.path.basename(file_path)}\n")
+            f.write(f"Длительность: {duration:.2f} сек\n")
+            f.write(f"Темп: {tempo:.2f} BPM\n")
+            f.write(f"Количество ударов: {len(beat_times)}\n")
+            f.write(f"Временные метки ударов: {', '.join([f'{x:.2f}' for x in beat_times[:10]])}...\n")
+            f.write(f"Спектральный центроид: {spectral_centroid:.2f} Гц\n")
+            f.write(f"Спектральный спад: {spectral_rolloff:.2f} Гц\n")
+            f.write(f"Спектральная ширина: {spectral_bandwidth:.2f} Гц\n")
+            f.write(f"Средние MFCC: {', '.join([f'{x:.2f}' for x in mfcc_mean])}\n")
+            f.write(f"Средняя хромаграмма: {', '.join([f'{x:.2f}' for x in chroma_mean])}\n")
+            f.write(f"Количество звуковых событий (onsets): {onset_count}\n")
+            f.write(f"Временные метки событий: {', '.join([f'{x:.2f}' for x in onset_times[:10]])}...\n")
+            f.write(f"Средняя энергия (RMS): {rms:.4f}\n")
+            f.write(f"Путь к спектрограмме: {spectrogram_path}\n")
+            f.write(f"Путь к хромаграмме: {chromagram_path}\n")
+
+        # Сохранение результатов в модель Song
+        song.tempo = tempo
+        song.duration = duration
+        song.spectral_centroid = spectral_centroid
+        song.onset_count = onset_count
+        song.analysis_report_path = report_path
+        song.spectrogram_path = spectrogram_path
+        db.session.commit()
+
+        # Краткий результат для flash-сообщения
+        summary = (
+            f"Темп: {tempo:.2f} BPM, "
+            f"Длительность: {duration:.2f} сек, "
+            f"Спектральный центроид: {spectral_centroid:.2f} Гц, "
+            f"Звуковые события: {onset_count}"
+        )
+
+        return {
+            'summary': summary,
+            'spectrogram_path': spectrogram_path,
+            'chromagram_path': chromagram_path,
+            'report_path': report_path
+        }
+
+    except Exception as e:
+        logging.error(f"Ошибка анализа: {e}")
+        raise
+
+@app.route('/analysis/<int:song_id>')
+@login_required
+def view_analysis(song_id):
+    song = Song.query.get_or_404(song_id)
+    if song.playlist.user_id != current_user.id:
+        flash('Вы не можете просматривать анализ этой песни.')
+        return redirect(url_for('playlists_page'))
+
+    if not song.analysis_report_path or not os.path.exists(song.analysis_report_path):
+        flash('Анализ для этой песни не найден.')
+        return redirect(url_for('playlists_page'))
+
+    # Читаем текстовый отчёт
+    with open(song.analysis_report_path, 'r', encoding='utf-8') as f:
+        report_content = f.read()
+
+    # Собираем пути к изображениям
+    images = []
+    if song.spectrogram_path and os.path.exists(song.spectrogram_path):
+        images.append({'path': song.spectrogram_path, 'title': 'Спектрограмма'})
+    if os.path.exists(song.analysis_report_path.replace('report', 'chromagram')):
+        chromagram_path = song.analysis_report_path.replace('report', 'chromagram')
+        images.append({'path': chromagram_path, 'title': 'Хромаграмма'})
+
+    return render_template('analysis.html', song=song, report_content=report_content, images=images)
+
+@app.route('/analysis_file/<filename>')
+@login_required
+def serve_analysis_file(filename):
+    file_path = os.path.join(ANALYSIS_DIR, filename)
+    if os.path.exists(file_path):
+        return send_file(file_path)
+    flash('Файл анализа не найден.')
+    return redirect(url_for('playlists_page'))
 
 if __name__ == '__main__':
     with app.app_context():

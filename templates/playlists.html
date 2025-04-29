@@ -32,36 +32,61 @@
                 {% if playlist.songs %}
                     <ul>
                         {% for song in playlist.songs %}
-                            <li>
-                                <details>
-                                    <summary>{{ song.name }} (<a href="{{ song.url }}" target="_blank">Слухати</a>)</summary>
-                                    <div>
-                                        {% if song.genres %}
-                                            <p><strong>Жанри:</strong> {{ song.genres }}</p>
-                                        {% else %}
-                                            <p><em>Жанри відсутні</em></p>
-                                        {% endif %}
-                                        <p><strong>Популярність:</strong> {{ song.popularity if song.popularity is not none else 'Н/Д' }}</p>
-                                        <p><strong>Длительность:</strong> {{ (song.duration_ms / 1000 / 60) | round(2) if song.duration_ms else 'Н/Д' }} мин</p>
-                                        <p><strong>Явный контент:</strong> {{ 'Да' if song.explicit else 'Нет' }}</p>
-                                        <p><strong>Дата выпуска:</strong> {{ song.release_date if song.release_date else 'Н/Д' }}</p>
-                                        <form method="POST" action="{{ url_for('rate_song', song_id=song.id) }}">
-                                            <label>Оцінка (1-10):</label>
-                                            <input type="number" name="rating" min="1" max="10" value="{{ song.rating or '' }}">
-                                            <button type="submit">Оцінити</button>
-                                        </form>
-                                        <form method="POST" action="{{ url_for('add_note', song_id=song.id) }}">
-                                            <label>Нотатка:</label>
-                                            <input type="text" name="note" value="{{ song.notes or '' }}" placeholder="Нотатка">
-                                            <button type="submit">Зберегти</button>
-                                        </form>
-                                        <form method="POST" action="{{ url_for('delete_song', song_id=song.id) }}" style="display:inline;">
-                                            <button type="submit" onclick="return confirm('Ви впевнені, що хочете видалити цю пісню?');">Видалити пісню</button>
-                                        </form>
-                                    </div>
-                                </details>
-                            </li>
-                        {% endfor %}
+    <li>
+    <details>
+        <summary>{{ song.name }} (<a href="{{ song.url }}" target="_blank">Слухати</a>)</summary>
+        <div>
+            {% if song.genres %}
+                <p><strong>Жанри:</strong> {{ song.genres }}</p>
+            {% else %}
+                <p><em>Жанри відсутні</em></p>
+            {% endif %}
+            <p><strong>Популярність:</strong> {{ song.popularity if song.popularity is not none else 'Н/Д' }}</p>
+            <p><strong>Длительность:</strong> {{ (song.duration_ms / 1000 / 60) | round(2) if song.duration_ms else 'Н/Д' }} мин</p>
+            <p><strong>Явный контент:</strong> {{ 'Да' if song.explicit else 'Нет' }}</p>
+            <p><strong>Дата выпуска:</strong> {{ song.release_date if song.release_date else 'Н/Д' }}</p>
+            <!-- Новые поля анализа -->
+            {% if song.tempo %}
+                <p><strong>Темп:</strong> {{ song.tempo | round(2) }} BPM</p>
+            {% endif %}
+            {% if song.duration %}
+                <p><strong>Длительность (анализ):</strong> {{ song.duration | round(2) }} сек</p>
+            {% endif %}
+            {% if song.spectral_centroid %}
+                <p><strong>Спектральный центроид:</strong> {{ song.spectral_centroid | round(2) }} Гц</p>
+            {% endif %}
+            {% if song.onset_count %}
+                <p><strong>Звуковые события:</strong> {{ song.onset_count }}</p>
+            {% endif %}
+            {% if song.analysis_report_path %}
+                <p><strong>Анализ:</strong> <a href="{{ url_for('view_analysis', song_id=song.id) }}">Посмотреть полный отчёт</a></p>
+            {% endif %}
+            <form method="POST" action="{{ url_for('rate_song', song_id=song.id) }}">
+                <label>Оцінка (1-10):</label>
+                <input type="number" name="rating" min="1" max="10" value="{{ song.rating or '' }}">
+                <button type="submit">Оцінити</button>
+            </form>
+            <form method="POST" action="{{ url_for('add_note', song_id=song.id) }}">
+                <label>Нотатка:</label>
+                <input type="text" name="note" value="{{ song.notes or '' }}" placeholder="Нотатка">
+                <button type="submit">Зберегти</button>
+            </form>
+            <form method="POST" action="{{ url_for('delete_song', song_id=song.id) }}" style="display:inline;">
+                <button type="submit" onclick="return confirm('Ви впевнені, що хочете видалити цю пісню?');">Видалити пісню</button>
+            </form>
+            <form method="POST" action="{{ url_for('download_song', song_id=song.id) }}" style="display:inline;">
+                <button type="submit" onclick="return confirm('Скачать песню для анализа?');">Скачать</button>
+            </form>
+            <form method="POST" action="{{ url_for('analyze_song', song_id=song.id) }}" style="display:inline;">
+                <button type="submit" {% if not song.file_path %}disabled{% endif %}>Анализировать</button>
+            </form>
+            {% if song.file_path %}
+                <p><strong>Файл:</strong> {{ song.file_path }}</p>
+            {% endif %}
+        </div>
+    </details>
+</li>
+{% endfor %}
                     </ul>
                 {% else %}
                     <p>У цьому плейлисті поки немає пісень.</p>
