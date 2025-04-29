@@ -1,21 +1,18 @@
 import json
 from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash
 from flask_bcrypt import Bcrypt
-from datetime import datetime
-from sqlalchemy.orm import relationship
+from flask_migrate import Migrate
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from urllib.parse import urlparse
-from flask_migrate import Migrate
 import requests
 import base64
 import logging
+from database import db, User, Playlist, Song
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 # Инициализация приложения
 app = Flask(__name__)
@@ -26,48 +23,13 @@ app.config['SPOTIPY_CLIENT_ID'] = '79357f9118c243568eb3847e9a6baaa9'
 app.config['SPOTIPY_CLIENT_SECRET'] = '7a301db0ee9041a7ac8685b5f6613a70'
 app.config['SPOTIPY_REDIRECT_URI'] = 'http://localhost:5000/callback'
 bcrypt = Bcrypt(app)
-db = SQLAlchemy(app)
+db.init_app(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 migrate = Migrate(app, db)
 
 with app.app_context():
     db.create_all()  # Создаём таблицы при запуске приложения
-
-
-
-class User(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(150), unique=True, nullable=False)
-    password = db.Column(db.String(150), nullable=False)
-    spotify_token = db.Column(db.String(255))
-    playlists = db.relationship('Playlist', back_populates='user')
-
-
-class Playlist(db.Model):
-    __tablename__ = 'playlists'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    user = db.relationship('User', back_populates='playlists')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    songs = db.relationship('Song', backref='playlist', lazy=True)
-
-
-class Song(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
-    url = db.Column(db.String(255), nullable=False)
-    playlist_id = db.Column(db.Integer, db.ForeignKey('playlists.id'), nullable=False)
-    spotify_id = db.Column(db.String(255))
-    rating = db.Column(db.Integer, nullable=True)
-    notes = db.Column(db.Text, nullable=True)
-
-    def __repr__(self):
-        return f'<Song {self.name}>'
-
-
-
 
 # Инициализация Spotify OAuth
 sp_oauth = SpotifyOAuth(
@@ -77,24 +39,19 @@ sp_oauth = SpotifyOAuth(
     scope='user-library-read user-read-private playlist-read-private playlist-read-collaborative'
 )
 
-
 @app.route('/login_spotify')
 @login_required
 def login_spotify():
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
 
-
 @app.route('/logout_spotify')
 @login_required
 def logout_spotify():
-    # Удаление токена доступа из данных пользователя
     current_user.spotify_token = None
     db.session.commit()
-
     flash('Вы успешно вышли из Spotify.')
     return redirect(url_for('home'))
-
 
 @app.route('/callback')
 def callback():
@@ -111,7 +68,6 @@ def callback():
         logging.error(f'Error in callback: {e}')
         flash('Ошибка при авторизации через Spotify.')
     return redirect(url_for('home'))
-
 
 def get_spotify_client():
     if not current_user.is_authenticated:
@@ -138,12 +94,9 @@ def get_spotify_client():
     logging.debug("Токена нет, нужен логин в Spotify")
     return None
 
-
-# Загрузка пользователя для Flask-Login
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-
 
 @app.route('/add_song_spotify/<int:playlist_id>', methods=['POST'])
 @login_required
@@ -180,25 +133,21 @@ def add_song_spotify(playlist_id):
 @app.route('/playlists')
 @login_required
 def playlists_page():
-    # Отображаем только плейлисты текущего пользователя
     playlists = Playlist.query.filter_by(user_id=current_user.id).all()
     return render_template('playlists.html', playlists=playlists)
-
-
 
 @app.route('/add_note/<int:song_id>', methods=['POST'])
 @login_required
 def add_note(song_id):
-    note = request.form.get('note')  # Получаем текст заметки
+    note = request.form.get('note')
     song = Song.query.get_or_404(song_id)
 
     if note:
-        song.notes = note  # Обновляем заметку
+        song.notes = note
         db.session.commit()
         flash(f'Заметка для песни "{song.name}" успешно обновлена!')
 
     return redirect(url_for('playlists_page'))
-
 
 def get_song_name_from_url(url):
     sp = get_spotify_client()
@@ -213,39 +162,33 @@ def get_song_name_from_url(url):
         logging.error(f"Ошибка при получении данных с Spotify: {e}")
         return None
 
-
 @app.route('/add_playlist', methods=['GET', 'POST'])
 @login_required
 def add_playlist():
     if request.method == 'POST':
         playlist_name = request.form['playlist_name']
+        description = request.form.get('description')  # Получаем описание
         if playlist_name:
-            new_playlist = Playlist(name=playlist_name, user_id=current_user.id)
+            new_playlist = Playlist(name=playlist_name, user_id=current_user.id, description=description)
             db.session.add(new_playlist)
             db.session.commit()
             flash('Плейлист успешно добавлен!')
         else:
             flash('Пожалуйста, введите название плейлиста.')
-        return redirect(url_for('playlists_page'))  # Перенаправляем на страницу с плейлистами
+        return redirect(url_for('playlists_page'))
 
-    return render_template('add_playlist.html')  # Отображаем форму для добавления плейлиста
+    return render_template('add_playlist.html')
 
-
-# Главная страница (переход на неё возможен только после логина)
 @app.route('/')
 @login_required
 def home():
     playlists = Playlist.query.filter_by(user_id=current_user.id).all()
-
-    # Проверка токена Spotify
     spotify_logged_in = bool(current_user.spotify_token)
-
     return render_template(
         'index.html',
         playlists=playlists,
         spotify_logged_in=spotify_logged_in
     )
-
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -263,8 +206,6 @@ def register():
 
     return render_template('register.html')
 
-
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -279,7 +220,6 @@ def login():
             flash('Неверное имя пользователя или пароль!')
     return render_template('login.html')
 
-
 @app.route('/logout')
 @login_required
 def logout():
@@ -293,22 +233,20 @@ def edit_playlist(id):
     if playlist and playlist.user_id == current_user.id:
         if request.method == 'POST':
             new_name = request.form['playlist_name']
-            if new_name and new_name != playlist.name:
+            description = request.form.get('description')  # Получаем описание
+            if new_name:
                 playlist.name = new_name
+                playlist.description = description  # Обновляем описание
                 db.session.commit()
                 flash(f"Плейлист '{new_name}' успешно обновлён!")
             else:
-                flash("Имя плейлиста не изменилось.")
+                flash("Пожалуйста, введите название плейлиста.")
             return redirect(url_for('playlists_page'))
     else:
         flash('Вы не можете редактировать этот плейлист.')
         return redirect(url_for('playlists_page'))
 
     return render_template('edit_playlist.html', playlist=playlist)
-
-
-
-
 
 @app.route('/delete_song/<int:song_id>', methods=['POST'])
 @login_required
@@ -334,7 +272,6 @@ def delete_song(song_id):
     else:
         return redirect(url_for('playlists_page', playlist_id=request.args.get('playlist_id')))
 
-
 @app.route('/delete_playlist/<int:playlist_id>', methods=['POST'])
 @login_required
 def delete_playlist(playlist_id):
@@ -350,7 +287,6 @@ def delete_playlist(playlist_id):
 
     return redirect(url_for('playlists_page'))
 
-
 @app.route('/rate_song/<int:song_id>', methods=['POST'])
 @login_required
 def rate_song(song_id):
@@ -358,7 +294,6 @@ def rate_song(song_id):
     if song:
         rating = request.form['rating']
         try:
-            # Сохраняем оценку
             song.rating = int(rating)
             db.session.commit()
             flash(f'Оценка для песни "{song.name}" успешно обновлена!')
@@ -367,8 +302,7 @@ def rate_song(song_id):
     else:
         flash('Ошибка: песня не найдена.')
 
-    return redirect(url_for('playlists_page'))  # Возвращаем пользователя на страницу с плейлистами
-
+    return redirect(url_for('playlists_page'))
 
 @app.route('/import_spotify_playlist', methods=['POST'])
 @login_required
@@ -385,38 +319,37 @@ def import_spotify_playlist():
         return redirect(url_for('playlists_page'))
 
     try:
-        # Разбираем URL
         parsed_url = urlparse(playlist_url)
         spotify_id = parsed_url.path.split('/')[-1].split('?')[0]
         logging.debug(f"Извлечённый Spotify ID: {spotify_id}")
 
-        # Определяем тип контента
         if '/playlist/' in parsed_url.path:
             logging.debug("Обрабатываем плейлист")
             data = sp.playlist(spotify_id)
             tracks = data['tracks']['items']
             source_type = "плейлиста"
+            description = data.get('description', None)  # Получаем описание из Spotify
         elif '/album/' in parsed_url.path:
             logging.debug("Обрабатываем альбом")
             data = sp.album(spotify_id)
             tracks = data['tracks']['items']
             source_type = "альбома"
+            description = None  # Альбомы в Spotify обычно не имеют описания
         else:
             flash("Невірне посилання. Використовуйте плейлист або альбом Spotify.")
             return redirect(url_for('playlists_page'))
 
         logging.debug(f"Отримали {source_type}: {data['name']}")
 
-        # Создаём новый плейлист в БД
         new_playlist = Playlist(
             name=data['name'],
-            user_id=current_user.id
+            user_id=current_user.id,
+            description=description  # Добавляем описание
         )
         db.session.add(new_playlist)
         db.session.commit()
         logging.debug(f"Створено плейлист: {new_playlist.name} (ID: {new_playlist.id})")
 
-        # Додаємо треки
         added_count = 0
         for item in tracks:
             track = item['track'] if source_type == "плейлиста" else item
@@ -446,10 +379,7 @@ def import_spotify_playlist():
 
     return redirect(url_for('playlists_page'))
 
-
-
-
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # Создание таблиц в базе данных
+        db.create_all()
     app.run(debug=True)

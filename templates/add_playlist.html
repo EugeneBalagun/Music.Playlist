@@ -1,15 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Добавить плейлист{% endblock %}
+{% block title %}Додати плейлист{% endblock %}
 {% block content %}
-    <h1>Добавить новый плейлист</h1>
-    <form method="POST">
-        <div>
-            <label>Название плейлиста:</label><br>
-            <input type="text" name="playlist_name" required>
-        </div>
-        <div>
-            <button type="submit">Создать</button>
-        </div>
-    </form>
-    <p><a href="{{ url_for('playlists_page') }}">Вернуться к плейлистам</a></p>
+<h1>Додати новий плейлист</h1>
+<form method="POST">
+    <label for="playlist_name">Назва плейлиста:</label><br>
+    <input type="text" name="playlist_name" id="playlist_name" required><br>
+    <label for="description">Опис:</label><br>
+    <textarea name="description" id="description" rows="4" cols="50"></textarea><br>
+    <button type="submit">Створити</button>
+</form>
+<p><a href="{{ url_for('playlists_page') }}">Назад до плейлистів</a></p>
 {% endblock %}

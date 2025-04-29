@@ -19,6 +19,11 @@
         <details>
             <summary>{{ playlist.name }} (Створено: {{ playlist.created_at.strftime('%Y-%m-%d') }})</summary>
             <div>
+                {% if playlist.description %}
+                    <p><strong>Опис:</strong> {{ playlist.description }}</p>
+                {% else %}
+                    <p><em>Опис відсутній</em></p>
+                {% endif %}
                 <form method="POST" action="{{ url_for('add_song_spotify', playlist_id=playlist.id) }}">
                     <input type="text" name="song_url" placeholder="Посилання на пісню Spotify" required>
                     <button type="submit">Додати пісню</button>
