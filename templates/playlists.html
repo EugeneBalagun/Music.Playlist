@@ -36,6 +36,15 @@
                                 <details>
                                     <summary>{{ song.name }} (<a href="{{ song.url }}" target="_blank">Слухати</a>)</summary>
                                     <div>
+                                        {% if song.genres %}
+                                            <p><strong>Жанри:</strong> {{ song.genres }}</p>
+                                        {% else %}
+                                            <p><em>Жанри відсутні</em></p>
+                                        {% endif %}
+                                        <p><strong>Популярність:</strong> {{ song.popularity if song.popularity is not none else 'Н/Д' }}</p>
+                                        <p><strong>Длительность:</strong> {{ (song.duration_ms / 1000 / 60) | round(2) if song.duration_ms else 'Н/Д' }} мин</p>
+                                        <p><strong>Явный контент:</strong> {{ 'Да' if song.explicit else 'Нет' }}</p>
+                                        <p><strong>Дата выпуска:</strong> {{ song.release_date if song.release_date else 'Н/Д' }}</p>
                                         <form method="POST" action="{{ url_for('rate_song', song_id=song.id) }}">
                                             <label>Оцінка (1-10):</label>
                                             <input type="number" name="rating" min="1" max="10" value="{{ song.rating or '' }}">

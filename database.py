@@ -18,7 +18,7 @@ class Playlist(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     user = db.relationship('User', back_populates='playlists')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    description = db.Column(db.String(500), nullable=True)  # Новая колонка
+    description = db.Column(db.String(500), nullable=True)
     songs = db.relationship('Song', backref='playlist', lazy=True)
 
 class Song(db.Model):
@@ -29,6 +29,11 @@ class Song(db.Model):
     spotify_id = db.Column(db.String(255))
     rating = db.Column(db.Integer, nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    genres = db.Column(db.String(255), nullable=True)
+    popularity = db.Column(db.Integer, nullable=True)  # Популярность (0–100)
+    duration_ms = db.Column(db.Integer, nullable=True)  # Длительность в миллисекундах
+    explicit = db.Column(db.Boolean, nullable=True)  # Явный контент
+    release_date = db.Column(db.String(50), nullable=True)  # Дата выпуска
 
     def __repr__(self):
         return f'<Song {self.name}>'

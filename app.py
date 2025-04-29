@@ -1,5 +1,6 @@
 import json
-from flask import Flask, render_template, request, redirect, url_for, flash
+import requests
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash
 from flask_bcrypt import Bcrypt
@@ -7,8 +8,6 @@ from flask_migrate import Migrate
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from urllib.parse import urlparse
-import requests
-import base64
 import logging
 from database import db, User, Playlist, Song
 
@@ -22,6 +21,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SPOTIPY_CLIENT_ID'] = '79357f9118c243568eb3847e9a6baaa9'
 app.config['SPOTIPY_CLIENT_SECRET'] = '7a301db0ee9041a7ac8685b5f6613a70'
 app.config['SPOTIPY_REDIRECT_URI'] = 'http://localhost:5000/callback'
+app.config['LASTFM_API_KEY'] = 'a618107a2b9f5a21c6b6de4818e70c6b'
+app.config['LASTFM_SHARED_SECRET'] = '645060ce2167708025f599fb081dedbc'
 bcrypt = Bcrypt(app)
 db.init_app(app)
 login_manager = LoginManager(app)
@@ -38,6 +39,20 @@ sp_oauth = SpotifyOAuth(
     redirect_uri=app.config['SPOTIPY_REDIRECT_URI'],
     scope='user-library-read user-read-private playlist-read-private playlist-read-collaborative'
 )
+
+# Функция для получения жанров из Last.fm
+def get_genre_from_lastfm(track_name, artist_name):
+    url = f"http://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key={app.config['LASTFM_API_KEY']}&artist={artist_name}&track={track_name}&format=json"
+    try:
+        response = requests.get(url)
+        data = response.json()
+        if 'track' in data and 'toptags' in data['track']:
+            tags = [tag['name'] for tag in data['track']['toptags']['tag']]
+            return tags[:3]  # Возвращаем первые 3 тега (обычно это жанры)
+        return []
+    except Exception as e:
+        logging.error(f"Ошибка Last.fm API: {e}")
+        return []
 
 @app.route('/login_spotify')
 @login_required
@@ -61,9 +76,14 @@ def callback():
         token_info = sp_oauth.get_access_token(code)
         sp = spotipy.Spotify(auth=token_info['access_token'])
         logging.debug(f'Token received: {token_info}')
-        current_user.spotify_token = token_info['access_token']
+        current_user.spotify_token = token_info['refresh_token']  # Сохраняем refresh_token
         db.session.commit()
         flash("Вы успешно авторизованы через Spotify!")
+
+        # Проверяем, есть ли сохранённый URL плейлиста для импорта
+        if 'pending_playlist_url' in session:
+            playlist_url = session.pop('pending_playlist_url')  # Извлекаем и удаляем из сессии
+            return redirect(url_for('import_spotify_playlist', playlist_url=playlist_url))
     except Exception as e:
         logging.error(f'Error in callback: {e}')
         flash('Ошибка при авторизации через Spotify.')
@@ -80,22 +100,26 @@ def get_spotify_client():
         return spotipy.Spotify(auth=token_info['access_token'])
 
     if current_user.spotify_token:
-        logging.debug(f"Токен из базы: {current_user.spotify_token}")
+        logging.debug(f"Refresh token из базы: {current_user.spotify_token}")
         try:
             token_info = sp_oauth.refresh_access_token(current_user.spotify_token)
-            current_user.spotify_token = token_info['access_token']
+            current_user.spotify_token = token_info['refresh_token']  # Обновляем refresh_token
             db.session.commit()
             logging.debug("Токен успешно обновлён")
             return spotipy.Spotify(auth=token_info['access_token'])
         except Exception as e:
             logging.error(f"Ошибка обновления токена: {e}")
+            current_user.spotify_token = None  # Очищаем недействительный токен
+            db.session.commit()
+            flash("Ваш Spotify токен недействителен. Пожалуйста, авторизуйтесь снова.")
             return None
 
     logging.debug("Токена нет, нужен логин в Spotify")
+    flash("Пожалуйста, авторизуйтесь в Spotify для продолжения.")
     return None
 
 @login_manager.user_loader
-def load_user(user_id):
+def user_loader(user_id):
     return User.query.get(int(user_id))
 
 @app.route('/add_song_spotify/<int:playlist_id>', methods=['POST'])
@@ -108,19 +132,27 @@ def add_song_spotify(playlist_id):
 
     sp = get_spotify_client()
     if not sp:
-        flash('Ошибка при подключении к Spotify.')
-        return redirect(url_for('playlists_page'))
+        return redirect(url_for('login_spotify'))  # Перенаправляем на авторизацию
 
     try:
         parsed_url = urlparse(song_url)
-        track_id = parsed_url.path.split('/')[-1]
+        track_id = parsed_url.path.split('/')[-1].split('?')[0]
         track = sp.track(track_id)
+        artist_name = track['artists'][0]['name']  # Получаем имя исполнителя
+
+        # Получаем жанры из Last.fm
+        genres = get_genre_from_lastfm(track['name'], artist_name)
 
         new_song = Song(
             name=track['name'],
             url=track['external_urls']['spotify'],
             spotify_id=track_id,
-            playlist_id=playlist_id
+            playlist_id=playlist_id,
+            genres=','.join(genres) if genres else None,
+            popularity=track.get('popularity'),
+            duration_ms=track.get('duration_ms'),
+            explicit=track.get('explicit'),
+            release_date=track['album'].get('release_date')
         )
         db.session.add(new_song)
         db.session.commit()
@@ -167,7 +199,7 @@ def get_song_name_from_url(url):
 def add_playlist():
     if request.method == 'POST':
         playlist_name = request.form['playlist_name']
-        description = request.form.get('description')  # Получаем описание
+        description = request.form.get('description')
         if playlist_name:
             new_playlist = Playlist(name=playlist_name, user_id=current_user.id, description=description)
             db.session.add(new_playlist)
@@ -233,10 +265,10 @@ def edit_playlist(id):
     if playlist and playlist.user_id == current_user.id:
         if request.method == 'POST':
             new_name = request.form['playlist_name']
-            description = request.form.get('description')  # Получаем описание
+            description = request.form.get('description')
             if new_name:
                 playlist.name = new_name
-                playlist.description = description  # Обновляем описание
+                playlist.description = description
                 db.session.commit()
                 flash(f"Плейлист '{new_name}' успешно обновлён!")
             else:
@@ -315,8 +347,8 @@ def import_spotify_playlist():
 
     sp = get_spotify_client()
     if not sp:
-        flash("Spotify клієнт не активний.")
-        return redirect(url_for('playlists_page'))
+        session['pending_playlist_url'] = playlist_url  # Сохраняем URL для импорта после авторизации
+        return redirect(url_for('login_spotify'))  # Перенаправляем на авторизацию
 
     try:
         parsed_url = urlparse(playlist_url)
@@ -328,13 +360,13 @@ def import_spotify_playlist():
             data = sp.playlist(spotify_id)
             tracks = data['tracks']['items']
             source_type = "плейлиста"
-            description = data.get('description', None)  # Получаем описание из Spotify
+            description = data.get('description', None)
         elif '/album/' in parsed_url.path:
             logging.debug("Обрабатываем альбом")
             data = sp.album(spotify_id)
             tracks = data['tracks']['items']
             source_type = "альбома"
-            description = None  # Альбомы в Spotify обычно не имеют описания
+            description = None
         else:
             flash("Невірне посилання. Використовуйте плейлист або альбом Spotify.")
             return redirect(url_for('playlists_page'))
@@ -344,7 +376,7 @@ def import_spotify_playlist():
         new_playlist = Playlist(
             name=data['name'],
             user_id=current_user.id,
-            description=description  # Добавляем описание
+            description=description
         )
         db.session.add(new_playlist)
         db.session.commit()
@@ -357,11 +389,20 @@ def import_spotify_playlist():
                 logging.debug("Трек пропущено: немає ID")
                 continue
 
+            # Получаем жанры из Last.fm
+            artist_name = track['artists'][0]['name']
+            genres = get_genre_from_lastfm(track['name'], artist_name)
+
             song = Song(
                 name=track['name'],
                 url=track['external_urls']['spotify'],
                 spotify_id=track['id'],
-                playlist_id=new_playlist.id
+                playlist_id=new_playlist.id,
+                genres=','.join(genres) if genres else None,
+                popularity=track.get('popularity'),
+                duration_ms=track.get('duration_ms'),
+                explicit=track.get('explicit'),
+                release_date=track['album'].get('release_date')
             )
             db.session.add(song)
             added_count += 1
