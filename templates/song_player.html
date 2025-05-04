@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}Проигрыватель: {{ song.name }}{% endblock %}
+{% block content %}
+<h1>Проигрыватель: {{ song.name }}</h1>
+
+<div class="player-container">
+    <div class="spectrogram-container">
+        <canvas id="spectrogramCanvas"></canvas>
+    </div>
+    <div class="controls">
+        <audio id="audioPlayer" controls>
+            <source src="{{ url_for('serve_song_processing_file', filename=song.file_path | basename) }}" type="audio/mpeg">
+            Ваш браузер не поддерживает элемент audio.
+        </audio>
+        <div class="time-display">
+            <span id="currentTime">00:00</span> / <span id="duration">{{ (song.duration | round(0)) | format_time }}</span>
+        </div>
+        <input type="range" id="seekSlider" min="0" max="1000" value="0">
+        <div class="zoom-controls">
+            <button id="zoomIn">Zoom In</button>
+            <button id="zoomOut">Zoom Out</button>
+        </div>
+    </div>
+</div>
+<p><a href="{{ url_for('song_processing', song_id=song.id) }}">Вернуться к обработке</a></p>
+<p><a href="{{ url_for('playlists_page') }}">Вернуться к плейлистам</a></p>
+
+<style>
+    .player-container {
+        border: 1px solid #ddd;
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    .spectrogram-container {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: auto;
+        margin-bottom: 20px;
+        min-height: 600px; /* Соответствует высоте спектрограммы */
+        max-height: 800px;
+    }
+    #spectrogramCanvas {
+        max-width: none;
+        border: 1px solid #ddd;
+        display: block;
+    }
+    .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    #audioPlayer {
+        width: 100%;
+    }
+    .time-display {
+        text-align: center;
+        font-size: 16px;
+    }
+    #seekSlider {
+        width: 100%;
+    }
+    .zoom-controls {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+    .zoom-controls button {
+        padding: 8px 16px;
+        cursor: pointer;
+    }
+</style>
+
+<script>
+    const audio = document.getElementById('audioPlayer');
+    const canvas = document.getElementById('spectrogramCanvas');
+    const ctx = canvas.getContext('2d');
+    const seekSlider = document.getElementById('seekSlider');
+    const currentTimeSpan = document.getElementById('currentTime');
+    const durationSpan = document.getElementById('duration');
+    const zoomInButton = document.getElementById('zoomIn');
+    const zoomOutButton = document.getElementById('zoomOut');
+
+    let zoomFactor = 1.0;
+    let spectrogramImage = new Image();
+    spectrogramImage.src = "{{ url_for('serve_song_processing_file', filename=song.spectrogram_path | basename) }}";
+    let duration = {{ song.duration | default(0) }};
+    let dataArea;
+    try {
+        dataArea = {{ data_area | tojson | safe }} || { x0: 0.05, x1: 0.95, width: 0.9, pixel_x0: 0, pixel_width: 0 };
+        if (!dataArea.x0 || !dataArea.width) {
+            throw new Error('Invalid dataArea');
+        }
+        console.log('dataArea:', dataArea);
+    } catch (e) {
+        console.error('Error parsing dataArea:', e);
+        dataArea = { x0: 0.05, x1: 0.95, width: 0.9, pixel_x0: 0, pixel_width: 0 };
+    }
+
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    spectrogramImage.onload = function() {
+        console.log('Spectrogram image loaded:', spectrogramImage.width, 'x', spectrogramImage.height);
+        updateCanvas();
+    };
+    spectrogramImage.onerror = function() {
+        console.error('Ошибка загрузки спектрограммы');
+        alert('Не удалось загрузить спектрограмму');
+    };
+
+    function updateCanvas(currentTime = 0) {
+        const scaledWidth = spectrogramImage.width * zoomFactor;
+        const scaledHeight = spectrogramImage.height * zoomFactor;
+        canvas.width = scaledWidth;
+        canvas.height = scaledHeight;
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(spectrogramImage, 0, 0, scaledWidth, scaledHeight);
+
+        if (duration > 0) {
+            const dataWidthPixels = dataArea.width * scaledWidth;
+            const dataX0Pixels = dataArea.x0 * scaledWidth;
+            const normalizedTime = currentTime / duration;
+            const xPos = dataX0Pixels + normalizedTime * dataWidthPixels;
+
+            console.log(`updateCanvas: xPos=${xPos}, dataX0Pixels=${dataX0Pixels}, dataWidthPixels=${dataWidthPixels}, normalizedTime=${normalizedTime}, currentTime=${currentTime}`);
+
+            if (xPos >= 0 && xPos <= scaledWidth) {
+                ctx.beginPath();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 4;
+                ctx.setLineDash([5, 5]);
+                ctx.moveTo(xPos, 0);
+                ctx.lineTo(xPos, scaledHeight);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+    }
+
+    let positionBuffer = [];
+    const maxBufferSize = 5;
+    let lastUpdateTime = 0;
+    const updateInterval = 50; // Обновлять каждые 50 мс для плавности
+
+    function smoothUpdate() {
+        if (duration > 0 && audio.currentTime >= 0) {
+            const now = performance.now();
+            if (now - lastUpdateTime < updateInterval) {
+                requestAnimationFrame(smoothUpdate);
+                return;
+            }
+            lastUpdateTime = now;
+
+            positionBuffer.push(audio.currentTime);
+            if (positionBuffer.length > maxBufferSize) {
+                positionBuffer.shift();
+            }
+            const smoothedTime = positionBuffer.reduce((a, b) => a + b, 0) / positionBuffer.length;
+
+            const sliderValue = (smoothedTime / duration) * 1000;
+            seekSlider.value = sliderValue;
+            currentTimeSpan.textContent = formatTime(smoothedTime);
+            updateCanvas(smoothedTime);
+
+            const container = document.querySelector('.spectrogram-container');
+            const canvasWidth = canvas.width;
+            const containerWidth = container.clientWidth;
+            if (canvasWidth > containerWidth) {
+                const dataWidthPixels = dataArea.width * canvasWidth;
+                const dataX0Pixels = dataArea.x0 * canvasWidth;
+                const normalizedTime = smoothedTime / duration;
+                const xPos = dataX0Pixels + normalizedTime * dataWidthPixels;
+                const scrollRange = canvasWidth - containerWidth;
+                const scrollPos = xPos - containerWidth / 2;
+                container.scrollLeft = Math.max(0, Math.min(scrollPos, scrollRange));
+                console.log(`smoothUpdate: scrollPos=${scrollPos}, xPos=${xPos}, canvasWidth=${canvasWidth}, containerWidth=${containerWidth}`);
+            }
+        }
+        if (!audio.paused && !audio.ended) {
+            requestAnimationFrame(smoothUpdate);
+        }
+    }
+
+    audio.addEventListener('loadedmetadata', function() {
+        duration = audio.duration;
+        durationSpan.textContent = formatTime(duration);
+        seekSlider.max = 1000;
+        audio.currentTime = 0;
+        updateCanvas(0);
+        console.log('Loaded metadata, duration:', duration);
+    });
+
+    audio.addEventListener('loadeddata', function() {
+        audio.currentTime = 0;
+        seekSlider.value = 0;
+        currentTimeSpan.textContent = '00:00';
+        positionBuffer = [];
+        updateCanvas(0);
+        console.log('Loaded data, reset to start');
+    });
+
+    audio.addEventListener('play', function() {
+        positionBuffer = [audio.currentTime];
+        lastUpdateTime = performance.now();
+        requestAnimationFrame(smoothUpdate);
+        console.log('Play started, currentTime:', audio.currentTime);
+    });
+
+    audio.addEventListener('pause', function() {
+        updateCanvas(audio.currentTime);
+        console.log('Paused, currentTime:', audio.currentTime);
+    });
+
+    audio.addEventListener('ended', function() {
+        seekSlider.value = 0;
+        currentTimeSpan.textContent = '00:00';
+        audio.currentTime = 0;
+        positionBuffer = [];
+        updateCanvas(0);
+        console.log('Audio ended, reset');
+    });
+
+    seekSlider.addEventListener('input', function() {
+        if (duration > 0) {
+            const newTime = (seekSlider.value / 1000) * duration;
+            audio.currentTime = newTime;
+            positionBuffer = [newTime];
+            updateCanvas(newTime);
+            console.log('Seek to:', newTime);
+        }
+    });
+
+    zoomInButton.addEventListener('click', function() {
+        zoomFactor = Math.min(zoomFactor * 1.2, 5.0);
+        updateCanvas(audio.currentTime);
+        console.log('Zoom In:', zoomFactor);
+    });
+
+    zoomOutButton.addEventListener('click', function() {
+        zoomFactor = Math.max(zoomFactor / 1.2, 0.5);
+        updateCanvas(audio.currentTime);
+        console.log('Zoom Out:', zoomFactor);
+    });
+</script>
+
+{% endblock %}

@@ -48,6 +48,9 @@
 <!-- Результаты анализа -->
 {% if analysis_result %}
     <h2>Результаты анализа</h2>
+    {% if song.file_path and song.spectrogram_path %}
+        <p><a href="{{ url_for('song_player', song_id=song.id) }}">Открыть в интерактивном проигрывателе</a></p>
+    {% endif %}
     <details>
         <summary>Полный отчет</summary>
         <pre>{{ analysis_result.report_content }}</pre>
@@ -177,7 +180,7 @@
     img {
         margin: 10px 0;
         border: 1px solid #ddd;
-        max-width: 100%;
+        max-width: none;
     }
     pre {
         background-color: #f8f8f8;

@@ -40,8 +40,17 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 migrate = Migrate(app, db)
 
-# Фильтр для Jinja
+# Фильтры для Jinja
 app.jinja_env.filters['basename'] = basename
+
+
+def format_time(seconds):
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes:02d}:{secs:02d}"
+
+
+app.jinja_env.filters['format_time'] = format_time
 
 with app.app_context():
     db.create_all()  # Создаём таблицы при запуске приложения
@@ -70,6 +79,7 @@ N_CUSTOM = 39123338641
 K_STANDARD = 7
 N_STANDARD = 12
 
+
 # Функция для получения жанров из Last.fm
 def get_genre_from_lastfm(track_name, artist_name):
     url = f"http://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key={app.config['LASTFM_API_KEY']}&artist={artist_name}&track={track_name}&format=json"
@@ -84,11 +94,13 @@ def get_genre_from_lastfm(track_name, artist_name):
         logging.error(f"Ошибка Last.fm API: {e}")
         return []
 
+
 @app.route('/login_spotify')
 @login_required
 def login_spotify():
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
+
 
 @app.route('/logout_spotify')
 @login_required
@@ -97,6 +109,7 @@ def logout_spotify():
     db.session.commit()
     flash('Вы успешно вышли из Spotify.')
     return redirect(url_for('home'))
+
 
 @app.route('/callback')
 def callback():
@@ -116,6 +129,7 @@ def callback():
         logging.error(f'Error in callback: {e}')
         flash('Ошибка при авторизации через Spotify.')
     return redirect(url_for('home'))
+
 
 def get_spotify_client():
     if not current_user.is_authenticated:
@@ -143,9 +157,11 @@ def get_spotify_client():
     flash("Пожалуйста, авторизуйтесь в Spotify для продолжения.")
     return None
 
+
 @login_manager.user_loader
 def user_loader(user_id):
     return User.query.get(int(user_id))
+
 
 @app.route('/add_song_spotify/<int:playlist_id>', methods=['POST'])
 @login_required
@@ -182,11 +198,13 @@ def add_song_spotify(playlist_id):
         flash("Не удалось добавить песню.")
     return redirect(url_for('playlists_page'))
 
+
 @app.route('/playlists')
 @login_required
 def playlists_page():
     playlists = Playlist.query.filter_by(user_id=current_user.id).all()
     return render_template('playlists.html', playlists=playlists)
+
 
 @app.route('/add_note/<int:song_id>', methods=['POST'])
 @login_required
@@ -198,6 +216,7 @@ def add_note(song_id):
         db.session.commit()
         flash(f'Заметка для песни "{song.name}" успешно обновлена!')
     return redirect(url_for('playlists_page'))
+
 
 def get_song_name_from_url(url):
     sp = get_spotify_client()
@@ -211,6 +230,7 @@ def get_song_name_from_url(url):
     except Exception as e:
         logging.error(f"Ошибка при получении данных с Spotify: {e}")
         return None
+
 
 @app.route('/add_playlist', methods=['GET', 'POST'])
 @login_required
@@ -228,6 +248,7 @@ def add_playlist():
         return redirect(url_for('playlists_page'))
     return render_template('add_playlist.html')
 
+
 @app.route('/')
 @login_required
 def home():
@@ -238,6 +259,7 @@ def home():
         playlists=playlists,
         spotify_logged_in=spotify_logged_in
     )
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -253,6 +275,7 @@ def register():
         return redirect(url_for('home'))
     return render_template('register.html')
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -267,11 +290,13 @@ def login():
             flash('Неверное имя пользователя или пароль!')
     return render_template('login.html')
 
+
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
 
 @app.route('/edit_playlist/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -294,6 +319,7 @@ def edit_playlist(id):
         return redirect(url_for('playlists_page'))
     return render_template('edit_playlist.html', playlist=playlist)
 
+
 @app.route('/delete_song/<int:song_id>', methods=['POST'])
 @login_required
 def delete_song(song_id):
@@ -312,6 +338,7 @@ def delete_song(song_id):
     else:
         return redirect(url_for('playlists_page', playlist_id=request.args.get('playlist_id')))
 
+
 @app.route('/delete_playlist/<int:playlist_id>', methods=['POST'])
 @login_required
 def delete_playlist(playlist_id):
@@ -324,6 +351,7 @@ def delete_playlist(playlist_id):
     else:
         flash('Вы не можете удалить этот плейлист.')
     return redirect(url_for('playlists_page'))
+
 
 @app.route('/rate_song/<int:song_id>', methods=['POST'])
 @login_required
@@ -340,6 +368,7 @@ def rate_song(song_id):
     else:
         flash('Ошибка: песня не найдена.')
     return redirect(url_for('playlists_page'))
+
 
 @app.route('/import_spotify_playlist', methods=['POST'])
 @login_required
@@ -413,6 +442,7 @@ def import_spotify_playlist():
         flash("Не вдалося імпортувати плейлист.")
     return redirect(url_for('playlists_page'))
 
+
 @app.route('/api/songs/<int:playlist_id>', methods=['GET'])
 @login_required
 def get_songs_data(playlist_id):
@@ -431,6 +461,7 @@ def get_songs_data(playlist_id):
     } for song in songs]
     return jsonify(songs_data)
 
+
 @app.route('/playlist/<int:playlist_id>/charts')
 @login_required
 def playlist_charts(playlist_id):
@@ -439,6 +470,7 @@ def playlist_charts(playlist_id):
         flash('Вы не можете просматривать графики этого плейлиста.')
         return redirect(url_for('playlists_page'))
     return render_template('charts.html', playlist=playlist)
+
 
 @app.route('/download_song/<int:song_id>', methods=['POST'])
 @login_required
@@ -481,6 +513,7 @@ def download_song(song_id):
         flash(f'Не удалось скачать песню: {str(e)}')
     return redirect(url_for('playlists_page'))
 
+
 def analyze_song(file_path, song):
     try:
         y, sr = librosa.load(file_path, sr=None)
@@ -500,21 +533,55 @@ def analyze_song(file_path, song):
         onset_times = onsets.tolist()
         rms = librosa.feature.rms(y=y).mean()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        # Генерация спектрограммы, как в PyQt5, с увеличенной шириной
         spectrogram_path = os.path.join(ANALYSIS_DIR, f'spectrogram_{song.id}_{timestamp}.png')
-        plt.figure(figsize=(10, 4))
-        librosa.display.specshow(librosa.amplitude_to_db(np.abs(librosa.stft(y)), ref=np.max),
-                                 sr=sr, x_axis='time', y_axis='log')
-        plt.colorbar(format='%+2.0f dB')
-        plt.title(f'Spectrogram: {song.name}')
-        plt.savefig(spectrogram_path)
-        plt.close()
+        window_size = 1024
+        step_size = 512
+        chunk_duration_sec = 4
+        spectrogram, time, freq = process_full_audio(y, sr, window_size, step_size, chunk_duration_sec)
+        width_pixels = max(5000, int(500 * duration / 10))  # Аналогично PyQt5: 500 пикселей на 10 секунд
+        fig_width = width_pixels / 100  # Масштабируем для figsize
+        fig = plt.figure(figsize=(fig_width, 6), dpi=100)
+        ax = fig.add_subplot(111)
+        im = ax.imshow(
+            20 * np.log10(spectrogram + 1e-6),
+            aspect='auto',
+            origin='lower',
+            extent=[time[0], time[-1], freq[0], freq[-1]],
+            cmap='magma'
+        )
+        ax.set_xlabel('Время [с]')
+        ax.set_ylabel('Частота [Гц]')
+        ax.set_title(f'FFT Спектрограмма: {song.name}')
+        fig.colorbar(im, ax=ax, label='Амплитуда [dB]')
+        fig.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
+
+        # Сохранение границ области данных
+        ax_pos = ax.get_position()
+        data_area = {
+            'x0': ax_pos.x0,
+            'x1': ax_pos.x1,
+            'width': ax_pos.width,
+            'pixel_x0': ax_pos.x0 * fig.dpi * fig_width,
+            'pixel_width': ax_pos.width * fig.dpi * fig_width
+        }
+        data_area_path = os.path.join(ANALYSIS_DIR, f'data_area_{song.id}_{timestamp}.json')
+        with open(data_area_path, 'w') as f:
+            json.dump(data_area, f)
+
+        plt.savefig(spectrogram_path, bbox_inches='tight')
+        plt.close(fig)
+
+        # Генерация хромаграммы
         chromagram_path = os.path.join(ANALYSIS_DIR, f'chromagram_{song.id}_{timestamp}.png')
-        plt.figure(figsize=(10, 4))
+        plt.figure(figsize=(20, 4), dpi=150)
         librosa.display.specshow(chroma, y_axis='chroma', x_axis='time', sr=sr)
         plt.colorbar()
         plt.title(f'Chromagram: {song.name}')
-        plt.savefig(chromagram_path)
+        plt.savefig(chromagram_path, bbox_inches='tight')
         plt.close()
+
         report_path = os.path.join(ANALYSIS_DIR, f'report_{song.id}_{timestamp}.txt')
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(f"Анализ аудиофайла: {os.path.basename(file_path)}\n")
@@ -532,6 +599,8 @@ def analyze_song(file_path, song):
             f.write(f"Средняя энергия (RMS): {rms:.4f}\n")
             f.write(f"Путь к спектрограмме: {spectrogram_path}\n")
             f.write(f"Путь к хромаграмме: {chromagram_path}\n")
+            f.write(f"Путь к данным области: {data_area_path}\n")
+
         song.tempo = tempo
         song.duration = duration
         song.spectral_centroid = spectral_centroid
@@ -540,6 +609,7 @@ def analyze_song(file_path, song):
         song.spectrogram_path = spectrogram_path
         song.chromagram_path = chromagram_path
         db.session.commit()
+
         summary = (
             f"Темп: {tempo:.2f} BPM, "
             f"Длительность: {duration:.2f} сек, "
@@ -554,11 +624,14 @@ def analyze_song(file_path, song):
             'report_content': open(report_path, 'r', encoding='utf-8').read(),
             'mfcc': mfcc_mean,
             'spectral_centroid': spectral_centroid,
-            'rms': rms
+            'rms': rms,
+            'data_area_path': data_area_path,
+            'data_area': data_area
         }
     except Exception as e:
         logging.error(f"Ошибка анализа: {e}")
         raise
+
 
 def pitch_shift_song(file_path, song, semitones, method='standard'):
     try:
@@ -579,20 +652,20 @@ def pitch_shift_song(file_path, song, semitones, method='standard'):
         sf.write(output_path, y_shifted, sr)
         logging.debug(f"Saved pitch-shifted file: {output_path}, exists: {os.path.exists(output_path)}")
         spectrogram_path = os.path.join(PITCH_SHIFT_DIR, f'spectrogram_{output_prefix}.png')
-        plt.figure(figsize=(10, 4))
+        plt.figure(figsize=(20, 4), dpi=150)
         librosa.display.specshow(librosa.amplitude_to_db(np.abs(librosa.stft(y_shifted)), ref=np.max),
                                  sr=sr, x_axis='time', y_axis='log')
         plt.colorbar(format='%+2.0f dB')
         plt.title(f'Spectrogram: {song.name} ({method}, {semitones} semitones)')
-        plt.savefig(spectrogram_path)
+        plt.savefig(spectrogram_path, bbox_inches='tight')
         plt.close()
         chromagram_path = os.path.join(PITCH_SHIFT_DIR, f'chromagram_{output_prefix}.png')
         chroma = librosa.feature.chroma_stft(y=y_shifted, sr=sr)
-        plt.figure(figsize=(10, 4))
+        plt.figure(figsize=(20, 4), dpi=150)
         librosa.display.specshow(chroma, y_axis='chroma', x_axis='time', sr=sr)
         plt.colorbar()
         plt.title(f'Chromagram: {song.name} ({method}, {semitones} semitones)')
-        plt.savefig(chromagram_path)
+        plt.savefig(chromagram_path, bbox_inches='tight')
         plt.close()
         logging.debug(f"Saved spectrogram: {spectrogram_path}, exists: {os.path.exists(spectrogram_path)}")
         if not os.path.exists(output_path):
@@ -613,6 +686,7 @@ def pitch_shift_song(file_path, song, semitones, method='standard'):
     except Exception as e:
         logging.error(f"Ошибка питч-шифтинга ({method}): {e}")
         raise
+
 
 def tempo_shift_song(file_path, song, semitones, method='standard'):
     try:
@@ -635,20 +709,20 @@ def tempo_shift_song(file_path, song, semitones, method='standard'):
         sf.write(output_path, y_shifted, sr)
         logging.debug(f"Saved tempo-shifted file: {output_path}, exists: {os.path.exists(output_path)}")
         spectrogram_path = os.path.join(TEMPO_SHIFT_DIR, f'spectrogram_{output_prefix}.png')
-        plt.figure(figsize=(10, 4))
+        plt.figure(figsize=(20, 4), dpi=150)
         librosa.display.specshow(librosa.amplitude_to_db(np.abs(librosa.stft(y_shifted)), ref=np.max),
                                  sr=sr, x_axis='time', y_axis='log')
         plt.colorbar(format='%+2.0f dB')
         plt.title(f'Spectrogram: {song.name} ({method}, {semitones} semitones)')
-        plt.savefig(spectrogram_path)
+        plt.savefig(spectrogram_path, bbox_inches='tight')
         plt.close()
         chromagram_path = os.path.join(TEMPO_SHIFT_DIR, f'chromagram_{output_prefix}.png')
         chroma = librosa.feature.chroma_stft(y=y_shifted, sr=sr)
-        plt.figure(figsize=(10, 4))
+        plt.figure(figsize=(20, 4), dpi=150)
         librosa.display.specshow(chroma, y_axis='chroma', x_axis='time', sr=sr)
         plt.colorbar()
         plt.title(f'Chromagram: {song.name} ({method}, {semitones} semitones)')
-        plt.savefig(chromagram_path)
+        plt.savefig(chromagram_path, bbox_inches='tight')
         plt.close()
         logging.debug(f"Saved spectrogram: {spectrogram_path}, exists: {os.path.exists(spectrogram_path)}")
         if not os.path.exists(output_path):
@@ -669,6 +743,7 @@ def tempo_shift_song(file_path, song, semitones, method='standard'):
     except Exception as e:
         logging.error(f"Ошибка изменения темпа ({method}): {e}")
         raise
+
 
 @app.route('/song_processing/<int:song_id>', methods=['GET', 'POST'])
 @login_required
@@ -742,7 +817,12 @@ def song_processing(song_id):
                     'mfcc': librosa.feature.mfcc(y=librosa.load(song.file_path, sr=44100)[0], sr=44100, n_mfcc=13).mean(
                         axis=1).tolist(),
                     'spectral_centroid': song.spectral_centroid,
-                    'rms': librosa.feature.rms(y=librosa.load(song.file_path, sr=44100)[0]).mean()
+                    'rms': librosa.feature.rms(y=librosa.load(song.file_path, sr=44100)[0]).mean(),
+                    'data_area_path': song.analysis_report_path.replace('.txt',
+                                                                        '.json') if song.analysis_report_path else None,
+                    'data_area': json.load(open(song.analysis_report_path.replace('.txt', '.json'),
+                                                'r')) if song.analysis_report_path and os.path.exists(
+                        song.analysis_report_path.replace('.txt', '.json')) else None
                 }
 
         if action == 'process' and song.file_path:
@@ -880,6 +960,7 @@ def song_processing(song_id):
                            tempo_shift_results=tempo_shift_results,
                            metrics=metrics)
 
+
 @app.route('/song_processing_file/<path:filename>')
 @login_required
 def serve_song_processing_file(filename):
@@ -889,6 +970,68 @@ def serve_song_processing_file(filename):
             return send_file(file_path)
     flash('Файл не найден.')
     return redirect(url_for('playlists_page'))
+
+
+@app.route('/song_player/<int:song_id>')
+@login_required
+def song_player(song_id):
+    song = Song.query.get_or_404(song_id)
+    if song.playlist.user_id != current_user.id:
+        flash('Вы не можете просматривать эту песню.')
+        return redirect(url_for('playlists_page'))
+    if not song.file_path or not os.path.exists(song.file_path):
+        flash('Аудиофайл не найден. Пожалуйста, сначала скачайте песню.')
+        return redirect(url_for('song_processing', song_id=song.id))
+    if not song.spectrogram_path or not os.path.exists(song.spectrogram_path):
+        try:
+            analysis_result = analyze_song(song.file_path, song)
+            song.spectrogram_path = analysis_result['spectrogram_path']
+            db.session.commit()
+        except Exception as e:
+            logging.error(f"Ошибка генерации спектрограммы: {e}")
+            flash('Не удалось сгенерировать спектрограмму.')
+            return redirect(url_for('song_processing', song_id=song.id))
+    # Загружаем границы области данных
+    data_area = None
+    data_area_path = song.analysis_report_path.replace('.txt', '.json') if song.analysis_report_path else None
+    if data_area_path and os.path.exists(data_area_path):
+        with open(data_area_path, 'r') as f:
+            data_area = json.load(f)
+    return render_template('song_player.html', song=song, data_area=data_area)
+
+
+def standard_fft_spectrogram(signal, sample_rate, window_size, step_size):
+    spectrogram = []
+    window = np.hanning(window_size)
+    for start in range(0, len(signal) - window_size, step_size):
+        segment = signal[start:start + window_size] * window
+        fft_result = np.fft.fft(segment)
+        magnitude = np.abs(fft_result[:window_size // 2])
+        spectrogram.append(magnitude)
+    spectrogram = np.array(spectrogram).T
+    time = np.arange(spectrogram.shape[1]) * (step_size / sample_rate)
+    freq = np.fft.fftfreq(window_size, d=1/sample_rate)[:window_size // 2]
+    return spectrogram, time, freq
+
+def process_full_audio(signal, sample_rate, window_size, step_size, chunk_duration_sec):
+    chunk_size = int(chunk_duration_sec * sample_rate)
+    full_spectrogram = []
+    full_time = []
+    for i in range(0, len(signal), chunk_size):
+        chunk = signal[i:i + chunk_size]
+        if len(chunk) < window_size:
+            break
+        spectrogram, time, freq = standard_fft_spectrogram(chunk, sample_rate, window_size, step_size)
+        if len(full_spectrogram) == 0:
+            full_spectrogram = spectrogram
+        else:
+            full_spectrogram = np.hstack((full_spectrogram, spectrogram))
+        if len(full_time) == 0:
+            full_time = time + i / sample_rate
+        else:
+            full_time = np.concatenate((full_time, time + i / sample_rate))
+    return full_spectrogram, full_time, freq
+
 
 if __name__ == '__main__':
     with app.app_context():
