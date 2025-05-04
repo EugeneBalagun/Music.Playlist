@@ -58,10 +58,7 @@
                                             <p><strong>Звукові події:</strong> {{ song.onset_count }}</p>
                                         {% endif %}
                                         {% if song.analysis_report_path %}
-                                            <p><strong>Аналіз:</strong> <a href="{{ url_for('view_analysis', song_id=song.id) }}">Переглянути повний звіт</a></p>
-                                        {% endif %}
-                                        {% if song.pitch_shifted_standard_path or song.pitch_shifted_custom_path %}
-                                            <p><strong>Питч-шифтинг:</strong> <a href="{{ url_for('pitch_shift_compare', song_id=song.id) }}">Переглянути результати</a></p>
+                                            <p><strong>Аналіз:</strong> <a href="{{ url_for('song_processing', song_id=song.id) }}">Переглянути повний звіт</a></p>
                                         {% endif %}
                                         <form method="POST" action="{{ url_for('rate_song', song_id=song.id) }}">
                                             <label>Оцінка (1-10):</label>
@@ -79,20 +76,7 @@
                                         <form method="POST" action="{{ url_for('download_song', song_id=song.id) }}" style="display:inline;">
                                             <button type="submit" onclick="return confirm('Завантажити пісню для аналізу?');">Завантажити</button>
                                         </form>
-                                        <form method="POST" action="{{ url_for('analyze_song', song_id=song.id) }}" style="display:inline;">
-                                            <button type="submit" {% if not song.file_path %}disabled{% endif %}>Аналізувати</button>
-                                        </form>
-                                        <form method="POST" action="{{ url_for('pitch_shift', song_id=song.id) }}" style="display:inline;">
-                                            <label>Питч-шифтинг:</label>
-                                            <select name="semitones">
-                                                <option value="-4">-4 півтона</option>
-                                                <option value="-2">-2 півтона</option>
-                                                <option value="1">+1 півтон</option>
-                                                <option value="2">+2 півтона</option>
-                                                <option value="4">+4 півтона</option>
-                                            </select>
-                                            <button type="submit" {% if not song.file_path %}disabled{% endif %}>Обробити</button>
-                                        </form>
+                                        <a href="{{ url_for('song_processing', song_id=song.id) }}">Аналізувати та обробити</a>
                                         {% if song.file_path %}
                                             <p><strong>Файл:</strong> {{ song.file_path }}</p>
                                         {% endif %}

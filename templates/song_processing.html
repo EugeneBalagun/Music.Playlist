@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Обработка песни: {{ song.name }}{% endblock %}
+{% block content %}
+<h1>Обработка песни: {{ song.name }}</h1>
+
+<!-- Форма для загрузки, анализа и обработки -->
+<div class="processing-form">
+    <h2>Настройки обработки</h2>
+    <form method="POST" action="{{ url_for('song_processing', song_id=song.id) }}">
+        {% if not song.file_path %}
+            <button type="submit" name="action" value="download">Скачать песню</button>
+        {% else %}
+            <button type="submit" name="action" value="analyze">Анализировать</button>
+            <h3>Питч-шифтинг</h3>
+            <label>Полутона:</label>
+            <select name="pitch_semitones">
+                <option value="-4">-4 полутона</option>
+                <option value="-2">-2 полутона</option>
+                <option value="1">+1 полутон</option>
+                <option value="2">+2 полутона</option>
+                <option value="4">+4 полутона</option>
+            </select>
+            <label>Методы:</label>
+            <input type="checkbox" name="pitch_methods" value="standard" checked> Стандартный
+            <input type="checkbox" name="pitch_methods" value="custom" checked> Ваш метод
+
+            <h3>Изменение темпа</h3>
+            <label>Полутона:</label>
+            <select name="tempo_semitones">
+                <option value="-4">-4 полутона</option>
+                <option value="-3">-3 полутона</option>
+                <option value="-2">-2 полутона</option>
+                <option value="-1">-1 полутон</option>
+                <option value="1">+1 полутон</option>
+                <option value="2">+2 полутона</option>
+                <option value="3">+3 полутона</option>
+                <option value="4">+4 полутона</option>
+            </select>
+            <label>Методы:</label>
+            <input type="checkbox" name="tempo_methods" value="standard" checked> Стандартный
+            <input type="checkbox" name="tempo_methods" value="custom" checked> Ваш метод
+
+            <button type="submit" name="action" value="process">Обработать</button>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Результаты анализа -->
+{% if analysis_result %}
+    <h2>Результаты анализа</h2>
+    <details>
+        <summary>Полный отчет</summary>
+        <pre>{{ analysis_result.report_content }}</pre>
+    </details>
+    <div class="visualizations">
+        <h3>Визуализации</h3>
+        {% if analysis_result.spectrogram_path %}
+            <details>
+                <summary>Спектрограмма</summary>
+                <img src="{{ url_for('serve_song_processing_file', filename=analysis_result.spectrogram_path | basename) }}" alt="Спектрограмма" style="max-width: 100%;">
+            </details>
+        {% endif %}
+        {% if analysis_result.chromagram_path %}
+            <details>
+                <summary>Хромаграмма</summary>
+                <img src="{{ url_for('serve_song_processing_file', filename=analysis_result.chromagram_path | basename) }}" alt="Хромаграмма" style="max-width: 100%;">
+            </details>
+        {% endif %}
+    </div>
+{% endif %}
+
+<!-- Результаты питч-шифтинга -->
+{% if pitch_shift_results %}
+    <h2>Питч-шифтинг</h2>
+    <div class="results-grid">
+        {% for result in pitch_shift_results %}
+            <div class="result-card">
+                <h3>{{ result.method }}</h3>
+                <audio controls>
+                    <source src="{{ url_for('serve_song_processing_file', filename=result.audio_path | basename) }}" type="audio/mpeg">
+                    Ваш браузер не поддерживает элемент audio.
+                </audio>
+                <p><a href="{{ url_for('serve_song_processing_file', filename=result.audio_path | basename) }}">Скачать трек</a></p>
+                <details>
+                    <summary>Спектрограмма</summary>
+                    <img src="{{ url_for('serve_song_processing_file', filename=result.spectrogram_path | basename) }}" alt="Спектрограмма {{ result.method }}" style="max-width: 100%;">
+                </details>
+                <details>
+                    <summary>Хромаграмма</summary>
+                    <img src="{{ url_for('serve_song_processing_file', filename=result.chromagram_path | basename) }}" alt="Хромаграмма {{ result.method }}" style="max-width: 100%;">
+                </details>
+                {% if metrics[result.method] %}
+                    <p><strong>Корреляция MFCC:</strong> {{ metrics[result.method].mfcc_correlation | round(4) }}</p>
+                    {% if result.method != 'Original' %}
+                        <p><strong>Разница в центроиде:</strong> {{ metrics[result.method].spectral_centroid_diff | round(2) }} Гц</p>
+                        <p><strong>Разница в RMS:</strong> {{ metrics[result.method].rms_diff | round(4) }}</p>
+                    {% else %}
+                        <p><strong>Спектральный центроид:</strong> {{ metrics[result.method].spectral_centroid | round(2) }} Гц</p>
+                        <p><strong>RMS:</strong> {{ metrics[result.method].rms | round(4) }}</p>
+                    {% endif %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+    {% if metrics.Standard and metrics.Custom %}
+        <h3>Сравнение методов</h3>
+        <p><strong>Разница в корреляции MFCC (Стандартный vs Ваш):</strong> {{ (metrics.Standard.mfcc_correlation - metrics.Custom.mfcc_correlation) | abs | round(6) }}</p>
+        <p><strong>Разница в спектральном центроиде:</strong> {{ (metrics.Standard.spectral_centroid_diff - metrics.Custom.spectral_centroid_diff) | abs | round(2) }} Гц</p>
+        <p><strong>Разница в RMS:</strong> {{ (metrics.Standard.rms_diff - metrics.Custom.rms_diff) | abs | round(4) }}</p>
+    {% endif %}
+{% endif %}
+
+<!-- Результаты изменения темпа -->
+{% if tempo_shift_results %}
+    <h2>Изменение темпа</h2>
+    <div class="results-grid">
+        {% for result in tempo_shift_results %}
+            <div class="result-card">
+                <h3>{{ result.method }}</h3>
+                <audio controls>
+                    <source src="{{ url_for('serve_song_processing_file', filename=result.audio_path | basename) }}" type="audio/mpeg">
+                    Ваш браузер не поддерживает элемент audio.
+                </audio>
+                <p><a href="{{ url_for('serve_song_processing_file', filename=result.audio_path | basename) }}">Скачать трек</a></p>
+                <details>
+                    <summary>Спектрограмма</summary>
+                    <img src="{{ url_for('serve_song_processing_file', filename=result.spectrogram_path | basename) }}" alt="Спектрограмма {{ result.method }}" style="max-width: 100%;">
+                </details>
+                <details>
+                    <summary>Хромаграмма</summary>
+                    <img src="{{ url_for('serve_song_processing_file', filename=result.chromagram_path | basename) }}" alt="Хромаграмма {{ result.method }}" style="max-width: 100%;">
+                </details>
+                {% if metrics[result.method] %}
+                    <p><strong>Корреляция MFCC:</strong> {{ metrics[result.method].mfcc_correlation | round(4) }}</p>
+                    {% if result.method != 'Original' %}
+                        <p><strong>Разница в центроиде:</strong> {{ metrics[result.method].spectral_centroid_diff | round(2) }} Гц</p>
+                        <p><strong>Разница в RMS:</strong> {{ metrics[result.method].rms_diff | round(4) }}</p>
+                    {% else %}
+                        <p><strong>Спектральный центроид:</strong> {{ metrics[result.method].spectral_centroid | round(2) }} Гц</p>
+                        <p><strong>RMS:</strong> {{ metrics[result.method].rms | round(4) }}</p>
+                    {% endif %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+    {% if metrics.Standard and metrics.Custom %}
+        <h3>Сравнение методов (Стандартный vs Ваш)</h3>
+        <p><strong>Разница в корреляции MFCC:</strong> {{ (metrics.Standard.mfcc_correlation - metrics.Custom.mfcc_correlation) | abs | round(6) }}</p>
+        <p><strong>Разница в спектральном центроиде:</strong> {{ (metrics.Standard.spectral_centroid_diff - metrics.Custom.spectral_centroid_diff) | abs | round(2) }} Гц</p>
+        <p><strong>Разница в RMS:</strong> {{ (metrics.Standard.rms_diff - metrics.Custom.rms_diff) | abs | round(4) }}</p>
+    {% endif %}
+{% endif %}
+
+<p><a href="{{ url_for('playlists_page') }}">Вернуться к плейлистам</a></p>
+
+<style>
+    .processing-form {
+        border: 1px solid #ddd;
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    .results-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    .result-card {
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 5px;
+    }
+    audio {
+        width: 100%;
+        margin: 10px 0;
+    }
+    img {
+        margin: 10px 0;
+        border: 1px solid #ddd;
+        max-width: 100%;
+    }
+    pre {
+        background-color: #f8f8f8;
+        padding: 10px;
+        border-radius: 5px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    details {
+        margin: 10px 0;
+    }
+    summary {
+        cursor: pointer;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}

@@ -4,14 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8556cd81-af04-4f65-a2c8-8c7320b3868a" name="Changes" comment="Скачивание, анализ , спектрограма">
-      <change afterPath="$PROJECT_DIR$/templates/pitch_shift_compare.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/pitch_shift_results.html" afterDir="false" />
+    <list default="true" id="8556cd81-af04-4f65-a2c8-8c7320b3868a" name="Changes" comment="Рабочий пич шифтинг в двух вариантах и рабочее сравнеине">
+      <change afterPath="$PROJECT_DIR$/templates/song_processing.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/templates/tempo_shift_compare.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.cache" beforeDir="false" afterPath="$PROJECT_DIR$/.cache" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/database.py" beforeDir="false" afterPath="$PROJECT_DIR$/database.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/instance/users.db" beforeDir="false" afterPath="$PROJECT_DIR$/instance/users.db" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/migrations/versions/3898c1944ac6_remove_audio_features_from_song_model.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/migrations/versions/39875c86b0f0_add_audio_features_to_song_model.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/migrations/versions/6d9d946e3851_.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/templates/playlists.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/playlists.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -144,7 +147,9 @@
       <workItem from="1745931743779" duration="1789000" />
       <workItem from="1745936867993" duration="3461000" />
       <workItem from="1745963471497" duration="1174000" />
-      <workItem from="1745964657567" duration="4596000" />
+      <workItem from="1745964657567" duration="5083000" />
+      <workItem from="1746103077259" duration="1210000" />
+      <workItem from="1746299617919" duration="9690000" />
     </task>
     <task id="LOCAL-00001" summary="Initial commit">
       <option name="closed" value="true" />
@@ -202,7 +207,15 @@
       <option name="project" value="LOCAL" />
       <updated>1745966794848</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Рабочий пич шифтинг в двух вариантах и рабочее сравнеине">
+      <option name="closed" value="true" />
+      <created>1745969361592</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1745969361592</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -215,13 +228,14 @@
     <MESSAGE value="Добавили жанры популярнтость описание, дата выпуска , маты" />
     <MESSAGE value="Добавили супер графики, супер чётко супер круто" />
     <MESSAGE value="Скачивание, анализ , спектрограма" />
-    <option name="LAST_COMMIT_MESSAGE" value="Скачивание, анализ , спектрограма" />
+    <MESSAGE value="Рабочий пич шифтинг в двух вариантах и рабочее сравнеине" />
+    <option name="LAST_COMMIT_MESSAGE" value="Рабочий пич шифтинг в двух вариантах и рабочее сравнеине" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/Music_Playlist_master$Flask__app_py_.coverage" NAME="Flask (app.py) Coverage Results" MODIFIED="1745932901043" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/app_py$Flask__app_py_.coverage" NAME="Flask (app.py) Coverage Results" MODIFIED="1745589101587" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/FlaskProject$FlaskProject.coverage" NAME="FlaskProject Coverage Results" MODIFIED="1742166525779" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
     <SUITE FILE_PATH="coverage/FlaskProject$Flask__app_py_.coverage" NAME="Flask (app.py) Coverage Results" MODIFIED="1744226156064" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/Music_Playlist$Flask__app_py_.coverage" NAME="Flask (app.py) Coverage Results" MODIFIED="1745969066116" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/Music_Playlist$Flask__app_py_.coverage" NAME="Flask (app.py) Coverage Results" MODIFIED="1746319354800" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
