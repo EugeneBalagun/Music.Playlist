@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Порівняння аудіовідбитків{% endblock %}
+{% block content %}
+<h1>Порівняння аудіовідбитків</h1>
+
+<h2>Порівнюємо: {{ song1.name }} проти {{ song2.name }}</h2>
+<p><strong>Загальна схожість:</strong> {{ similarity | round(2) }}%</p>
+<p>
+    {% if similarity > 80 %}
+        Ці пісні дуже схожі, ймовірно, це ремікс або кавер.
+    {% elif similarity > 50 %}
+        Ці пісні мають помірну схожість, можливо, мають спільні музичні елементи.
+    {% else %}
+        Ці пісні мають низьку схожість, що вказує на різний музичний зміст.
+    {% endif %}
+</p>
+<p>
+    {% if cached %}
+        Результат завантажено з кешу. <a href="{{ url_for('compare_fingerprints', song_id1=song1.id, song_id2=song2.id, force_recompute='true') }}">Перерахувати</a>
+    {% else %}
+        Результат щойно обчислений.
+    {% endif %}
+</p>
+
+<!-- Аудіоплеєри -->
+<h3>Прослухати пісні</h3>
+<div class="grid">
+    <div>
+        <h4>{{ song1.name }}</h4>
+        {% if song1.file_path and song1.file_path|basename %}
+            <audio controls class="w-100 mb-2">
+                <source src="{{ url_for('serve_song_processing_file', filename=song1.file_path|basename) }}" type="audio/mpeg">
+                Ваш браузер не підтримує відтворення аудіо.
+            </audio>
+        {% else %}
+            <p>Аудіо недоступне. Будь ласка, спочатку завантажте пісню.</p>
+        {% endif %}
+    </div>
+    <div>
+        <h4>{{ song2.name }}</h4>
+        {% if song2.file_path and song2.file_path|basename %}
+            <audio controls class="w-100 mb-2">
+                <source src="{{ url_for('serve_song_processing_file', filename=song2.file_path|basename) }}" type="audio/mpeg">
+                Ваш браузер не підтримує відтворення аудіо.
+            </audio>
+        {% else %}
+            <p>Аудіо недоступне. Будь ласка, спочатку завантажте пісню.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Спектрограми -->
+<h3>Спектрограми</h3>
+<div class="grid">
+    <div>
+        <h4>{{ song1.name }}</h4>
+        {% if song1.spectrogram_path and song1.spectrogram_path|basename %}
+            <img src="{{ url_for('serve_song_processing_file', filename=song1.spectrogram_path|basename) }}" alt="Спектрограма для {{ song1.name }}" class="w-100 mb-2">
+        {% else %}
+            <p>Спектрограма недоступна. Будь ласка, спочатку проаналізуйте пісню.</p>
+        {% endif %}
+    </div>
+    <div>
+        <h4>{{ song2.name }}</h4>
+        {% if song2.spectrogram_path and song2.spectrogram_path|basename %}
+            <img src="{{ url_for('serve_song_processing_file', filename=song2.spectrogram_path|basename) }}" alt="Спектрограма для {{ song2.name }}" class="w-100 mb-2">
+        {% else %}
+            <p>Спектрограма недоступна. Будь ласка, спочатку проаналізуйте пісню.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Таблиця детального порівняння -->
+<h3>Детальне порівняння</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Показник</th>
+            <th>Схожість (%)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for metric, value in details.items() %}
+        <tr>
+            <td>
+                <span class="tooltip" data-tooltip='
+                    {% if metric == "Spectral Peaks" %}
+                        <strong>Спектральні піки</strong><br>
+                        Показує, наскільки схожі домінуючі частотні піки в спектрограмах. Нижчі значення вказують на різний частотний вміст, наприклад, різні інструменти чи ефекти.<br>
+                        <em>Формула:</em> Співвідношення збіжних піків (у межах 0.1 с і 50 Гц, різниця амплітуди < 50%) до мінімальної кількості піків.
+                    {% elif metric == "Tempo" %}
+                        <strong>Темп</strong><br>
+                        Порівнює кількість ударів за хвилину (BPM). Висока схожість вказує на подібне ритмічне відчуття.<br>
+                        <em>Формула:</em> 1 - |t1 - t2| / max(t1, t2).
+                    {% elif metric == "Spectral Centroid" %}
+                        <strong>Спектральний центроїд</strong><br>
+                        Вимірює схожість середньої частоти, зваженої за амплітудою, що вказує на "яскравість" звуку. Подібні значення вказують на порівнянні тональні якості.<br>
+                        <em>Формула:</em> 1 - |c1 - c2| / max(c1, c2).
+                    {% elif metric == "Spectral Rolloff" %}
+                        <strong>Спектральний спад</strong><br>
+                        Порівнює частоту, нижче якої міститься 85% енергії. Відображає форму та насиченість спектра.<br>
+                        <em>Формула:</em> 1 - |r1 - r2| / max(r1, r2).
+                    {% elif metric == "Spectral Bandwidth" %}
+                        <strong>Ширина спектра</strong><br>
+                        Вимірює розподіл частот у сигналі. Подібні значення вказують на порівнянну спектральну складність.<br>
+                        <em>Формула:</em> 1 - |b1 - b2| / max(b1, b2).
+                    {% elif metric == "MFCC Correlation" %}
+                        <strong>Кореляція MFCC</strong><br>
+                        Порівнює мел-частотні кепстральні коефіцієнти, що відображають тембральну схожість (наприклад, вокал, інструменти). Висока кореляція вказує на подібну звукову текстуру.<br>
+                        <em>Формула:</em> Кореляція Пірсона для векторів MFCC.
+                    {% elif metric == "RMS" %}
+                        <strong>RMS</strong><br>
+                        Порівнює середньоквадратичну енергію, що вказує на загальну гучність. Подібні значення вказують на порівнянні рівні гучності.<br>
+                        <em>Формула:</em> 1 - |r1 - r2| / max(r1, r2).
+                    {% elif metric == "RMS Variance" %}
+                        <strong>Варіація RMS</strong><br>
+                        Вимірює коливання гучності, що відображає динамічний діапазон. Подібні значення вказують на порівнянну динаміку.<br>
+                        <em>Формула:</em> 1 - |v1 - v2| / max(v1, v2).
+                    {% elif metric == "Onset Count" %}
+                        <strong>Кількість звукових подій</strong><br>
+                        Порівнює кількість звукових подій (наприклад, удари барабанів). Відображає ритмічну щільність.<br>
+                        <em>Формула:</em> 1 - |o1 - o2| / max(o1, o2).
+                    {% elif metric == "Rhythmic Complexity" %}
+                        <strong>Ритмічна складність</strong><br>
+                        Порівнює варіацію інтервалів між звуковими подіями. Висока схожість вказує на подібні ритмічні структури.<br>
+                        <em>Формула:</em> 1 - |rc1 - rc2| / max(rc1, rc2).
+                    {% elif metric == "Chroma Correlation" %}
+                        <strong>Кореляція хроматичних профілів</strong><br>
+                        Порівнює профілі класів нот, що відображають мелодійну та гармонічну схожість. Висока кореляція вказує на подібні мелодії чи акорди.<br>
+                        <em>Формула:</em> Кореляція Пірсона для хроматичних векторів.
+                    {% elif metric == "Zero Crossing Rate" %}
+                        <strong>Частота переходів через нуль</strong><br>
+                        Порівнює, як часто сигнал перетинає нульову позначку, що вказує на шумність або текстуру. Подібні значення вказують на порівнянні звукові характеристики.<br>
+                        <em>Формула:</em> 1 - |z1 - z2| / max(z1, z2).
+                    {% elif metric == "Estimated Instruments" %}
+                        <strong>Оцінена кількість інструментів</strong><br>
+                        Оцінює кількість інструментів на основі унікальних частотних піків і варіації MFCC. Подібні значення вказують на порівнянну інструментацію.<br>
+                        <em>Формула:</em> 1 - |i1 - i2| / max(i1, i2).
+                    {% elif metric == "Segment Count" %}
+                        <strong>Кількість сегментів</strong><br>
+                        Порівнює кількість секцій пісні (наприклад, куплет, приспів). Відображає схожість у структурі пісні.<br>
+                        <em>Формула:</em> 1 - |s1 - s2| / max(s1, s2).
+                    {% endif %}
+                '>{{ metric }}</span>
+            </td>
+            <td>{{ value | round(2) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p><a href="{{ url_for('song_processing', song_id=song1.id) }}">Переглянути обробку {{ song1.name }}</a></p>
+<p><a href="{{ url_for('song_processing', song_id=song2.id) }}">Переглянути обробку {{ song2.name }}</a></p>
+<p><a href="{{ url_for('playlists_page') }}">Повернутися до плейлистів</a></p>
+
+<style>
+    .w-100 {
+        width: 100%;
+    }
+    .mb-2 {
+        margin-bottom: 1rem;
+    }
+    .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    img {
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    table {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    th, td {
+        padding: 10px;
+        text-align: left;
+    }
+    .tooltip {
+        position: relative;
+        border-bottom: 1px dotted #1db954;
+        color: #1db954;
+        cursor: help;
+    }
+    .tooltip:hover::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        top: 100%;
+        left: 0;
+        z-index: 10;
+        background-color: #2a2a2a;
+        color: #e0e0e0;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #1db954;
+        width: 300px;
+        font-size: 0.9rem;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+</style>
+{% endblock %}

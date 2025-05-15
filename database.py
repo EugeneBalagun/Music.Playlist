@@ -42,11 +42,25 @@ class Song(db.Model):
     onset_count = db.Column(db.Integer, nullable=True)
     analysis_report_path = db.Column(db.String(255), nullable=True)
     spectrogram_path = db.Column(db.String(255), nullable=True)
-    chromagram_path = db.Column(db.String(255), nullable=True)
-    pitch_shifted_standard_path = db.Column(db.String(255), nullable=True)
-    pitch_shifted_custom_path = db.Column(db.String(255), nullable=True)
     tempo_shifted_standard_path = db.Column(db.String(255), nullable=True)
     tempo_shifted_custom_path = db.Column(db.String(255), nullable=True)
+    fingerprint_path = db.Column(db.String(255), nullable=True)
 
     def __repr__(self):
         return f'<Song {self.name}>'
+
+class FingerprintComparison(db.Model):
+    __tablename__ = 'fingerprint_comparison'
+    id = db.Column(db.Integer, primary_key=True)
+    song_id1 = db.Column(db.Integer, db.ForeignKey('song.id'), nullable=False)
+    song_id2 = db.Column(db.Integer, db.ForeignKey('song.id'), nullable=False)
+    overall_similarity = db.Column(db.Float, nullable=False)
+    details = db.Column(db.Text, nullable=False)  # JSON string of comparison details
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    updated_at = db.Column(db.DateTime, onupdate=db.func.current_timestamp())
+    song1 = db.relationship('Song', foreign_keys=[song_id1])
+    song2 = db.relationship('Song', foreign_keys=[song_id2])
+
+    __table_args__ = (
+        db.UniqueConstraint('song_id1', 'song_id2', name='unique_song_pair'),
+    )

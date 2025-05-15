@@ -30,6 +30,29 @@
                 </form>
 
                 {% if playlist.songs %}
+                    <h3>Compare Songs</h3>
+<form method="GET" action="{{ url_for('compare_fingerprints_route') }}">
+    <select name="song_id1">
+        {% for song in playlist.songs %}
+            <option value="{{ song.id }}">{{ song.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="song_id2">
+        {% for song in playlist.songs %}
+            <option value="{{ song.id }}">{{ song.name }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Compare Fingerprints</button>
+</form>
+
+<script>
+function updateFormAction() {
+    const songId1 = document.getElementsByName('song_id1')[0].value;
+    const songId2 = document.getElementsByName('song_id2')[0].value;
+    const form = document.getElementById('compare-form');
+    form.action = `/compare_fingerprints/${songId1}/${songId2}`;
+}
+</script>
                     <ul>
                         {% for song in playlist.songs %}
                             <li>
@@ -56,6 +79,9 @@
                                         {% endif %}
                                         {% if song.onset_count %}
                                             <p><strong>Звукові події:</strong> {{ song.onset_count }}</p>
+                                        {% endif %}
+                                        {% if song.fingerprint_path %}
+                                            <p><strong>Fingerprint:</strong> {{ song.fingerprint_path | basename }}</p>
                                         {% endif %}
                                         {% if song.analysis_report_path %}
                                             <p><strong>Аналіз:</strong> <a href="{{ url_for('song_processing', song_id=song.id) }}">Переглянути повний звіт</a></p>
