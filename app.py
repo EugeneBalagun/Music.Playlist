@@ -121,7 +121,7 @@ def create_fingerprint(file_path, song):
                         'rhythmic_complexity': fingerprint_data['rhythmic_complexity'],
                         'segment_count': fingerprint_data['segment_count'],
                         'zcr': fingerprint_data['zcr'],
-                        'spectral_entropy': fingerprint_data.get('spectral_entropy', 0)  # Fallback for older fingerprints
+                        'spectral_entropy': fingerprint_data.get('spectral_entropy', 0)
                     },
                     'scatter_plot_path': song.scatter_plot_path if hasattr(song, 'scatter_plot_path') else None
                 }
@@ -151,10 +151,10 @@ def create_fingerprint(file_path, song):
         # Additional features
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr, hop_length=512)
         tempo = float(tempo)
-        spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr, hop_length=512).mean()
-        spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr, hop_length=512).mean()
+        spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr, hop_length=512).mean() / (sr / 100)  # Посилена нормалізація
+        spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr, hop_length=512).mean() / (sr / 100)
         spectral_bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr, hop_length=512)
-        spectral_bandwidth = (np.mean(spectral_bandwidth) + np.std(spectral_bandwidth)) / (sr / 16)
+        spectral_bandwidth = (np.mean(spectral_bandwidth) + np.std(spectral_bandwidth)) / (sr / 20)
         logging.debug(f"Spectral bandwidth: mean={np.mean(spectral_bandwidth)}, std={np.std(spectral_bandwidth)}, normalized={spectral_bandwidth}")
 
         # MFCC для сегментів
@@ -172,10 +172,10 @@ def create_fingerprint(file_path, song):
         rms = librosa.feature.rms(y=y, hop_length=512).mean()
         rms_var = librosa.feature.rms(y=y, hop_length=512).var()
         onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=512)
-        onsets = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr, units='time', hop_length=512, backtrack=True, delta=0.2)
+        onsets = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr, units='time', hop_length=512, backtrack=True, delta=0.5)  # Збільшено delta
         onset_count = len(onsets)
         onset_intervals = np.diff(onsets)
-        rhythmic_complexity = (np.std(onset_intervals) + np.mean(onset_intervals)) * len(onsets) / (duration * 100) if len(onset_intervals) > 0 else 0
+        rhythmic_complexity = (np.std(onset_intervals) + np.mean(onset_intervals)) * len(onsets) / (duration * 500) if len(onset_intervals) > 0 else 0
         logging.debug(f"Rhythmic complexity: std={np.std(onset_intervals)}, mean={np.mean(onset_intervals)}, onset_density={len(onsets)/duration}, value={rhythmic_complexity}")
 
         chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=512)
@@ -187,19 +187,18 @@ def create_fingerprint(file_path, song):
         # Спектральна ентропія
         S_power = np.abs(librosa.stft(y, n_fft=2048, hop_length=512))**2
         S_power = S_power / (np.sum(S_power, axis=0, keepdims=True) + 1e-6)
-        spectral_entropy = -np.sum(S_power * np.log2(S_power + 1e-6), axis=0).mean()
+        spectral_entropy = -np.sum(S_power * np.log2(S_power + 1e-10), axis=0).mean()
         logging.debug(f"Spectral entropy: {spectral_entropy}")
 
         # Segment Count
         segments_matrix = librosa.segment.recurrence_matrix(librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=512), mode='affinity')
         segment_count = len(np.unique(np.argmax(segments_matrix, axis=1)))
         segment_durations = np.diff(librosa.times_like(segments_matrix, sr=sr, hop_length=512))
-        segment_count = segment_count * (1 + np.std(segment_durations)) / (duration * 50) if len(segment_durations) > 0 else segment_count / (duration * 50)
+        segment_count = segment_count * (1 + np.std(segment_durations)) / (duration * 200) if len(segment_durations) > 0 else segment_count / (duration * 200)
         logging.debug(f"Segment count: raw={len(np.unique(np.argmax(segments_matrix, axis=1)))}, std_durations={np.std(segment_durations)}, normalized={segment_count}")
 
         # Візуалізація (хромаграма, MFCC heatmap, ΔMFCC)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        # Scatter Plot
         scatter_plot_path = os.path.join(FINGERPRINT_DIR, f'scatter_peaks_{song.id}_{timestamp}.png')
         plt.figure(figsize=(12, 6))
         times = [peak[0] for peak in fingerprints]
@@ -214,7 +213,6 @@ def create_fingerprint(file_path, song):
         plt.savefig(scatter_plot_path, bbox_inches='tight', dpi=150)
         plt.close()
 
-        # Chromagram
         chromagram_path = os.path.join(FINGERPRINT_DIR, f'chromagram_{song.id}_{timestamp}.png')
         plt.figure(figsize=(12, 6))
         librosa.display.specshow(librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=512), y_axis='chroma', x_axis='time', cmap='coolwarm')
@@ -223,7 +221,6 @@ def create_fingerprint(file_path, song):
         plt.savefig(chromagram_path, bbox_inches='tight', dpi=150)
         plt.close()
 
-        # MFCC Heatmap
         mfcc_path = os.path.join(FINGERPRINT_DIR, f'mfcc_{song.id}_{timestamp}.png')
         plt.figure(figsize=(12, 6))
         mfcc_full = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, hop_length=512)
@@ -233,7 +230,6 @@ def create_fingerprint(file_path, song):
         plt.savefig(mfcc_path, bbox_inches='tight', dpi=150)
         plt.close()
 
-        # ΔMFCC
         delta_mfcc_path = os.path.join(FINGERPRINT_DIR, f'delta_mfcc_{song.id}_{timestamp}.png')
         plt.figure(figsize=(12, 6))
         delta_mfcc = librosa.feature.delta(mfcc_full)
@@ -347,7 +343,7 @@ def compare_fingerprints(fingerprint_path1, fingerprint_path2, song_id1, song_id
 
         # Compare additional features
         tempo_diff = abs(data1['tempo'] - data2['tempo']) / max(data1['tempo'], data2['tempo'], 1e-6)
-        tempo_similarity = max(0, 1 - tempo_diff) * 100
+        tempo_similarity = max(0, 1 - tempo_diff) * 100 * 0.3
         logging.debug(f"Tempo similarity: {tempo_similarity}%")
 
         centroid_diff = abs(data1['spectral_centroid'] - data2['spectral_centroid']) / max(data1['spectral_centroid'], data2['spectral_centroid'], 1e-6)
@@ -362,28 +358,28 @@ def compare_fingerprints(fingerprint_path1, fingerprint_path2, song_id1, song_id
         bandwidth_similarity = max(0, 1 - bandwidth_diff) * 100
         logging.debug(f"Spectral Bandwidth similarity: {bandwidth_similarity}%")
 
-        # Segment-wise MFCC comparison using DTW (with fallback)
+        # Segment-wise MFCC comparison using DTW
         segment_mfccs1 = data1.get('segment_mfccs', [data1['mfcc']])
         segment_mfccs2 = data2.get('segment_mfccs', [data2['mfcc']])
-        if segment_mfccs1 and segment_mfccs2:
+        if segment_mfccs1 and segment_mfccs2 and len(segment_mfccs1) > 0 and len(segment_mfccs2) > 0:
             dtw_distances = []
-            for mfcc1, mfcc2 in zip(segment_mfccs1[:min(len(segment_mfccs1), len(segment_mfccs2))], segment_mfccs2[:min(len(segment_mfccs1), len(segment_mfccs2))]):
-                distance, _ = librosa.sequence.dtw(mfcc1, mfcc2)
-                dtw_distances.append(np.mean(distance))
-            segment_mfcc_similarity = max(0, 1 - np.mean(dtw_distances) / 100) * 100 if dtw_distances else 0
+            for i in range(min(len(segment_mfccs1), len(segment_mfccs2))):
+                distance, _ = librosa.sequence.dtw(np.array(segment_mfccs1[i]), np.array(segment_mfccs2[i]))
+                dtw_distances.append(np.mean(distance) / 20)  # Змінено нормалізацію до /20
+            segment_mfcc_similarity = max(0, 1 - np.mean(dtw_distances)) * 100 if dtw_distances else 0
         else:
             segment_mfcc_similarity = max(0, np.corrcoef(np.array(data1['mfcc']), np.array(data2['mfcc']))[0, 1]) * 100 if len(data1['mfcc']) == len(data2['mfcc']) else 0
         logging.debug(f"Segment MFCC similarity: {segment_mfcc_similarity}%")
 
-        # Segment-wise Chroma comparison using DTW (with fallback)
+        # Segment-wise Chroma comparison using DTW
         segment_chromas1 = data1.get('segment_chromas', [data1['chroma']])
         segment_chromas2 = data2.get('segment_chromas', [data2['chroma']])
-        if segment_chromas1 and segment_chromas2:
+        if segment_chromas1 and segment_chromas2 and len(segment_chromas1) > 0 and len(segment_chromas2) > 0:
             dtw_distances = []
-            for chroma1, chroma2 in zip(segment_chromas1[:min(len(segment_chromas1), len(segment_chromas2))], segment_chromas2[:min(len(segment_chromas1), len(segment_chromas2))]):
-                distance, _ = librosa.sequence.dtw(chroma1, chroma2)
-                dtw_distances.append(np.mean(distance))
-            segment_chroma_similarity = max(0, 1 - np.mean(dtw_distances) / 10) * 100 if dtw_distances else 0
+            for i in range(min(len(segment_chromas1), len(segment_chromas2))):
+                distance, _ = librosa.sequence.dtw(np.array(segment_chromas1[i]), np.array(segment_chromas2[i]))
+                dtw_distances.append(np.mean(distance) / 5)
+            segment_chroma_similarity = max(0, 1 - np.mean(dtw_distances)) * 100 if dtw_distances else 0
         else:
             chroma1 = np.array(data1['chroma'])
             chroma2 = np.array(data2['chroma'])
@@ -414,30 +410,31 @@ def compare_fingerprints(fingerprint_path1, fingerprint_path2, song_id1, song_id
         segment_similarity = max(0, 1 - segment_diff) * 100
         logging.debug(f"Segment Count similarity: {segment_similarity}%")
 
-        # Spectral Entropy comparison (with fallback)
         spectral_entropy1 = data1.get('spectral_entropy', 0)
         spectral_entropy2 = data2.get('spectral_entropy', 0)
-        entropy_diff = abs(spectral_entropy1 - spectral_entropy2) / max(spectral_entropy1, spectral_entropy2, 1e-6)
-        entropy_similarity = max(0, 1 - entropy_diff) * 100
+        if abs(spectral_entropy1 - spectral_entropy2) < 1e-3:
+            entropy_similarity = 50
+        else:
+            entropy_diff = abs(spectral_entropy1 - spectral_entropy2) / max(spectral_entropy1, spectral_entropy2, 1e-6)
+            entropy_similarity = max(0, 1 - entropy_diff) * 100
         logging.debug(f"Spectral Entropy similarity: {entropy_similarity}%")
 
         # Оновлені ваги
         weights = {
             'peak': 0.2,
-            'tempo': 0.03,
-            'centroid': 0.05,
-            'rolloff': 0.05,
-            'bandwidth': 0.05,
-            'segment_mfcc': 0.15,
-            'segment_chroma': 0.15,
+            'tempo': 0.01,
+            'centroid': 0.01,  # Зменшено
+            'rolloff': 0.01,  # Зменшено
+            'bandwidth': 0.01,
+            'segment_mfcc': 0.25,
+            'segment_chroma': 0.1,
             'rms': 0.05,
             'rms_var': 0.05,
-            'onset': 0.05,
-            'rhythmic': 0.05,
-            'chroma': 0.1,
+            'onset': 0.01,  # Зменшено
+            'rhythmic': 0.01,  # Зменшено
             'zcr': 0.05,
-            'segment': 0.02,
-            'entropy': 0.05
+            'segment': 0.005,  # Зменшено
+            'entropy': 0.02
         }
         overall_similarity = (
             weights['peak'] * peak_similarity +
@@ -451,7 +448,6 @@ def compare_fingerprints(fingerprint_path1, fingerprint_path2, song_id1, song_id
             weights['rms_var'] * rms_var_similarity +
             weights['onset'] * onset_similarity +
             weights['rhythmic'] * rhythmic_similarity +
-            weights['chroma'] * segment_chroma_similarity +
             weights['zcr'] * zcr_similarity +
             weights['segment'] * segment_similarity +
             weights['entropy'] * entropy_similarity
