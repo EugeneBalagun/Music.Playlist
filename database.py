@@ -45,6 +45,7 @@ class Song(db.Model):
     tempo_shifted_standard_path = db.Column(db.String(255), nullable=True)
     tempo_shifted_custom_path = db.Column(db.String(255), nullable=True)
     fingerprint_path = db.Column(db.String(255), nullable=True)
+    scatter_plot_path = db.Column(db.String(255), nullable=True)  # New field for scatter plot
 
     def __repr__(self):
         return f'<Song {self.name}>'

@@ -37,6 +37,10 @@
     <h2>Fingerprint Result</h2>
     <p><strong>Fingerprint created:</strong> {{ fingerprint_result.fingerprint_path | basename }}</p>
     <p><strong>Number of peaks:</strong> {{ fingerprint_result.fingerprint_count }}</p>
+    {% if fingerprint_result.scatter_plot_path %}
+        <h3>Spectral Peaks Scatter Plot</h3>
+        <img src="{{ url_for('serve_song_processing_file', filename=fingerprint_result.scatter_plot_path | basename) }}" alt="Spectral Peaks Scatter Plot" style="max-width: 100%;">
+    {% endif %}
 {% endif %}
 
 <!-- Analysis Results -->

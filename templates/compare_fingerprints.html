@@ -55,7 +55,7 @@
     <div>
         <h4>{{ song1.name }}</h4>
         {% if song1.spectrogram_path and song1.spectrogram_path|basename %}
-            <img src="{{ url_for('serve_song_processing_file', filename=song1.spectrogram_path|basename) }}" alt="Спектрограма для {{ song1.name }}" class="w-100 mb-2">
+            <img src="{{ url_for('serve_song_processing_file', filename=song1.spectrogram_path|basename) }}" alt="Спектрограма для {{ song1.name }}" class="spectrogram-img">
         {% else %}
             <p>Спектрограма недоступна. Будь ласка, спочатку проаналізуйте пісню.</p>
         {% endif %}
@@ -63,9 +63,30 @@
     <div>
         <h4>{{ song2.name }}</h4>
         {% if song2.spectrogram_path and song2.spectrogram_path|basename %}
-            <img src="{{ url_for('serve_song_processing_file', filename=song2.spectrogram_path|basename) }}" alt="Спектрограма для {{ song2.name }}" class="w-100 mb-2">
+            <img src="{{ url_for('serve_song_processing_file', filename=song2.spectrogram_path|basename) }}" alt="Спектрограма для {{ song2.name }}" class="spectrogram-img">
         {% else %}
             <p>Спектрограма недоступна. Будь ласка, спочатку проаналізуйте пісню.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Діаграми розсіювання спектральних піків -->
+<h3>Діаграми спектральних піків</h3>
+<div class="grid">
+    <div>
+        <h4>{{ song1.name }}</h4>
+        {% if song1.scatter_plot_path and song1.scatter_plot_path|basename %}
+            <img src="{{ url_for('serve_song_processing_file', filename=song1.scatter_plot_path|basename) }}" alt="Діаграма спектральних піків для {{ song1.name }}" class="w-100 mb-2">
+        {% else %}
+            <p>Діаграма спектральних піків недоступна. Будь ласка, спочатку створіть фінгерпринт.</p>
+        {% endif %}
+    </div>
+    <div>
+        <h4>{{ song2.name }}</h4>
+        {% if song2.scatter_plot_path and song2.scatter_plot_path|basename %}
+            <img src="{{ url_for('serve_song_processing_file', filename=song2.scatter_plot_path|basename) }}" alt="Діаграма спектральних піків для {{ song2.name }}" class="w-100 mb-2">
+        {% else %}
+            <p>Діаграма спектральних піків недоступна. Будь ласка, спочатку створіть фінгерпринт.</p>
         {% endif %}
     </div>
 </div>
@@ -83,121 +104,145 @@
         {% for metric, value in details.items() %}
         <tr>
             <td>
-                <span class="tooltip" data-tooltip='
+                <span class="tooltip" data-tooltip='{% filter safe %}
                     {% if metric == "Spectral Peaks" %}
                         <strong>Спектральні піки</strong><br>
-                        Показує, наскільки схожі домінуючі частотні піки в спектрограмах. Нижчі значення вказують на різний частотний вміст, наприклад, різні інструменти чи ефекти.<br>
-                        <em>Формула:</em> Співвідношення збіжних піків (у межах 0.1 с і 50 Гц, різниця амплітуди < 50%) до мінімальної кількості піків.
+                        Показує, наскільки схожі домінуючі частотні піки в спектрограмах. Нижчі значення вказують на різний частотний вміст (інструменти, ефекти).<br>
+                        <em>Формула:</em> Співвідношення збіжних піків (у межах 0.1 с і 50 Гц, різниця амплітуди < 50%) до мінімальної кількості піків у двох піснях.<br>
+                        <em>Приклад:</em> Якщо пісня 1 має 1000 піків, пісня 2 — 1200, і 800 збігаються, схожість = (800 / 1000) * 100 = 80%.
                     {% elif metric == "Tempo" %}
                         <strong>Темп</strong><br>
-                        Порівнює кількість ударів за хвилину (BPM). Висока схожість вказує на подібне ритмічне відчуття.<br>
-                        <em>Формула:</em> 1 - |t1 - t2| / max(t1, t2).
+                        Порівнює темп пісень у ударах за хвилину (BPM). Висока схожість вказує на подібну швидкість.<br>
+                        <em>Формула:</em> 100 * (1 - |BPM1 - BPM2| / max(BPM1, BPM2)).<br>
+                        <em>Приклад:</em> Якщо BPM1 = 120, BPM2 = 126, схожість = 100 * (1 - 6/126) ≈ 95.24%.
                     {% elif metric == "Spectral Centroid" %}
                         <strong>Спектральний центроїд</strong><br>
-                        Вимірює схожість середньої частоти, зваженої за амплітудою, що вказує на "яскравість" звуку. Подібні значення вказують на порівнянні тональні якості.<br>
-                        <em>Формула:</em> 1 - |c1 - c2| / max(c1, c2).
+                        Порівнює середню частоту спектра, що відображає яскравість звуку. Схожі значення вказують на подібний тембр.<br>
+                        <em>Формула:</em> 100 * (1 - |SC1 - SC2| / max(SC1, SC2)).<br>
+                        <em>Приклад:</em> Якщо SC1 = 2000 Гц, SC2 = 2100 Гц, схожість = 100 * (1 - 100/2100) ≈ 95.24%.
                     {% elif metric == "Spectral Rolloff" %}
                         <strong>Спектральний спад</strong><br>
-                        Порівнює частоту, нижче якої міститься 85% енергії. Відображає форму та насиченість спектра.<br>
-                        <em>Формула:</em> 1 - |r1 - r2| / max(r1, r2).
+                        Порівнює частоту, нижче якої зосереджено 85% спектральної енергії. Вказує на ширину спектра.<br>
+                        <em>Формула:</em> 100 * (1 - |SR1 - SR2| / max(SR1, SR2)).<br>
+                        <em>Приклад:</em> Якщо SR1 = 4000 Гц, SR2 = 4200 Гц, схожість = 100 * (1 - 200/4200) ≈ 95.24%.
                     {% elif metric == "Spectral Bandwidth" %}
-                        <strong>Ширина спектра</strong><br>
-                        Вимірює розподіл частот у сигналі. Подібні значення вказують на порівнянну спектральну складність.<br>
-                        <em>Формула:</em> 1 - |b1 - b2| / max(b1, b2).
+                        <strong>Спектральна ширина</strong><br>
+                        Порівнює ширину спектральної енергії, що відображає різноманітність частот. Схожі значення вказують на подібну текстуру звуку.<br>
+                        <em>Формула:</em> 100 * (1 - |SB1 - SB2| / max(SB1, SB2)).<br>
+                        <em>Приклад:</em> Якщо SB1 = 1500 Гц, SB2 = 1600 Гц, схожість = 100 * (1 - 100/1600) ≈ 93.75%.
                     {% elif metric == "MFCC Correlation" %}
-                        <strong>Кореляція MFCC</strong><br>
-                        Порівнює мел-частотні кепстральні коефіцієнти, що відображають тембральну схожість (наприклад, вокал, інструменти). Висока кореляція вказує на подібну звукову текстуру.<br>
-                        <em>Формула:</em> Кореляція Пірсона для векторів MFCC.
+                        <strong>Мел-частотні кепстральні коефіцієнти (MFCC)</strong><br>
+                        Порівнює тембральні характеристики через кореляцію MFCC, які відображають спектральну форму.<br>
+                        <em>Формула:</em> 100 * кореляція(MFCC1, MFCC2).<br>
+                        <em>Приклад:</em> Якщо кореляція = 0.9, схожість = 90%.
                     {% elif metric == "RMS" %}
-                        <strong>RMS</strong><br>
-                        Порівнює середньоквадратичну енергію, що вказує на загальну гучність. Подібні значення вказують на порівнянні рівні гучності.<br>
-                        <em>Формула:</em> 1 - |r1 - r2| / max(r1, r2).
+                        <strong>Середньоквадратична амплітуда (RMS)</strong><br>
+                        Порівнює середню гучність пісень. Висока схожість вказує на подібну динаміку.<br>
+                        <em>Формула:</em> 100 * (1 - |RMS1 - RMS2| / max(RMS1, RMS2)).<br>
+                        <em>Приклад:</em> Якщо RMS1 = 0.2, RMS2 = 0.22, схожість = 100 * (1 - 0.02/0.22) ≈ 90.91%.
                     {% elif metric == "RMS Variance" %}
-                        <strong>Варіація RMS</strong><br>
-                        Вимірює коливання гучності, що відображає динамічний діапазон. Подібні значення вказують на порівнянну динаміку.<br>
-                        <em>Формула:</em> 1 - |v1 - v2| / max(v1, v2).
+                        <strong>Дисперсія RMS</strong><br>
+                        Порівнює мінливість гучності. Висока схожість вказує на подібні динамічні зміни.<br>
+                        <em>Формула:</em> 100 * (1 - |RV1 - RV2| / max(RV1, RV2)).<br>
+                        <em>Приклад:</em> Якщо RV1 = 0.01, RV2 = 0.011, схожість = 100 * (1 - 0.001/0.011) ≈ 90.91%.
                     {% elif metric == "Onset Count" %}
                         <strong>Кількість звукових подій</strong><br>
-                        Порівнює кількість звукових подій (наприклад, удари барабанів). Відображає ритмічну щільність.<br>
-                        <em>Формула:</em> 1 - |o1 - o2| / max(o1, o2).
+                        Порівнює кількість звукових подій (onsets). Висока схожість вказує на подібну щільність подій.<br>
+                        <em>Формула:</em> 100 * (1 - |OC1 - OC2| / max(OC1, OC2)).<br>
+                        <em>Приклад:</em> Якщо OC1 = 100, OC2 = 110, схожість = 100 * (1 - 10/110) ≈ 90.91%.
                     {% elif metric == "Rhythmic Complexity" %}
                         <strong>Ритмічна складність</strong><br>
-                        Порівнює варіацію інтервалів між звуковими подіями. Висока схожість вказує на подібні ритмічні структури.<br>
-                        <em>Формула:</em> 1 - |rc1 - rc2| / max(rc1, rc2).
+                        Порівнює стандартне відхилення інтервалів між звуковими подіями. Висока схожість вказує на подібну ритмічну структуру.<br>
+                        <em>Формула:</em> 100 * (1 - |RC1 - RC2| / max(RC1, RC2)).<br>
+                        <em>Приклад:</em> Якщо RC1 = 0.2, RC2 = 0.22, схожість = 100 * (1 - 0.02/0.22) ≈ 90.91%.
                     {% elif metric == "Chroma Correlation" %}
-                        <strong>Кореляція хроматичних профілів</strong><br>
-                        Порівнює профілі класів нот, що відображають мелодійну та гармонічну схожість. Висока кореляція вказує на подібні мелодії чи акорди.<br>
-                        <em>Формула:</em> Кореляція Пірсона для хроматичних векторів.
+                        <strong>Хроматична кореляція</strong><br>
+                        Порівнює розподіл енергії по нотах (хроматичний профіль). Висока схожість вказує на подібну гармонію.<br>
+                        <em>Формула:</em> 100 * (кореляція(Chroma1, Chroma2) + 1) / 2.<br>
+                        <em>Приклад:</em> Якщо кореляція = 0.8, схожість = 100 * (0.8 + 1) / 2 = 90%.
                     {% elif metric == "Zero Crossing Rate" %}
-                        <strong>Частота переходів через нуль</strong><br>
-                        Порівнює, як часто сигнал перетинає нульову позначку, що вказує на шумність або текстуру. Подібні значення вказують на порівнянні звукові характеристики.<br>
-                        <em>Формула:</em> 1 - |z1 - z2| / max(z1, z2).
+                        <strong>Частота перетину нуля</strong><br>
+                        Порівнює частоту зміни знаку сигналу, що відображає високочастотний вміст. Висока схожість вказує на подібну текстуру.<br>
+                        <em>Формула:</em> 100 * (1 - |ZCR1 - ZCR2| / max(ZCR1, ZCR2)).<br>
+                        <em>Приклад:</em> Якщо ZCR1 = 0.1, ZCR2 = 0.11, схожість = 100 * (1 - 0.01/0.11) ≈ 90.91%.
                     {% elif metric == "Estimated Instruments" %}
-                        <strong>Оцінена кількість інструментів</strong><br>
-                        Оцінює кількість інструментів на основі унікальних частотних піків і варіації MFCC. Подібні значення вказують на порівнянну інструментацію.<br>
-                        <em>Формула:</em> 1 - |i1 - i2| / max(i1, i2).
+                        <strong>Оціночна кількість інструментів</strong><br>
+                        Порівнює оціночну кількість інструментів на основі спектральних піків і MFCC. Висока схожість вказує на подібну інструментовку.<br>
+                        <em>Формула:</em> 100 * (1 - |EI1 - EI2| / max(EI1, EI2)).<br>
+                        <em>Приклад:</em> Якщо EI1 = 5, EI2 = 6, схожість = 100 * (1 - 1/6) ≈ 83.33%.
                     {% elif metric == "Segment Count" %}
                         <strong>Кількість сегментів</strong><br>
-                        Порівнює кількість секцій пісні (наприклад, куплет, приспів). Відображає схожість у структурі пісні.<br>
-                        <em>Формула:</em> 1 - |s1 - s2| / max(s1, s2).
+                        Порівнює кількість унікальних сегментів у структурі пісень. Висока схожість вказує на подібну композиційну структуру.<br>
+                        <em>Формула:</em> 100 * (1 - |SC1 - SC2| / max(SC1, SC2)).<br>
+                        <em>Приклад:</em> Якщо SC1 = 10, SC2 = 12, схожість = 100 * (1 - 2/12) ≈ 83.33%.
                     {% endif %}
-                '>{{ metric }}</span>
+                {% endfilter %}'>{{ metric }}</span>
             </td>
-            <td>{{ value | round(2) }}</td>
+            <td>{{ value | round(2) }}%</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 
-<p><a href="{{ url_for('song_processing', song_id=song1.id) }}">Переглянути обробку {{ song1.name }}</a></p>
-<p><a href="{{ url_for('song_processing', song_id=song2.id) }}">Переглянути обробку {{ song2.name }}</a></p>
+<!-- Посилання для повернення -->
 <p><a href="{{ url_for('playlists_page') }}">Повернутися до плейлистів</a></p>
 
 <style>
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
     .w-100 {
         width: 100%;
     }
     .mb-2 {
-        margin-bottom: 1rem;
+        margin-bottom: 16px;
     }
-    .grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-        margin-bottom: 20px;
-    }
-    img {
-        border-radius: 5px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    .spectrogram-img {
+        width: 100%;
+        max-width: 800px; /* Збільшуємо максимальну ширину */
+        height: auto;
+        border: 1px solid #ddd;
+        display: block;
+        margin: 0 auto;
     }
     table {
         width: 100%;
-        margin-bottom: 20px;
+        border-collapse: collapse;
+        margin-top: 20px;
     }
     th, td {
-        padding: 10px;
+        border: 1px solid #ddd;
+        padding: 8px;
         text-align: left;
+    }
+    th {
+        background-color: #f2f2f2;
     }
     .tooltip {
         position: relative;
-        border-bottom: 1px dotted #1db954;
-        color: #1db954;
         cursor: help;
+        text-decoration: underline dotted;
     }
     .tooltip:hover::after {
         content: attr(data-tooltip);
         position: absolute;
-        top: 100%;
-        left: 0;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #333;
+        color: #fff;
+        padding: 8px;
+        border-radius: 4px;
+        width: 350px;
         z-index: 10;
-        background-color: #2a2a2a;
-        color: #e0e0e0;
-        padding: 10px;
-        border-radius: 5px;
-        border: 1px solid #1db954;
-        width: 300px;
-        font-size: 0.9rem;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        white-space: normal;
+        font-size: 12px;
+    }
+    audio {
+        margin: 10px 0;
     }
 </style>
 {% endblock %}
