@@ -59,8 +59,11 @@ class FingerprintComparison(db.Model):
     details = db.Column(db.Text, nullable=False)  # JSON string of comparison details
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     updated_at = db.Column(db.DateTime, onupdate=db.func.current_timestamp())
+    fingerprint_hash1 = db.Column(db.String(32), nullable=True)  # MD5 hash
+    fingerprint_hash2 = db.Column(db.String(32), nullable=True)
     song1 = db.relationship('Song', foreign_keys=[song_id1])
     song2 = db.relationship('Song', foreign_keys=[song_id2])
+    updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
 
     __table_args__ = (
         db.UniqueConstraint('song_id1', 'song_id2', name='unique_song_pair'),
