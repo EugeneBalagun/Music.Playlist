@@ -33,7 +33,7 @@
     </div>
 
     <!-- Fingerprint Result -->
-    {% if fingerprint_result %}
+    {% if fingerprint_result and fingerprint_result.fingerprint_path %}
         <h2>Fingerprint Result</h2>
         <p><strong>Fingerprint created:</strong> {{ fingerprint_result.fingerprint_path | basename }}</p>
         <p><strong>Number of peaks:</strong> {{ fingerprint_result.fingerprint_count }}</p>
@@ -46,11 +46,15 @@
                 </tr>
             </thead>
             <tbody>
-                <tr><td>Tempo</td><td>{{ fingerprint_result.features.tempo | round(2) }} BPM</td></tr>
-                <tr><td>Spectral Centroid</td><td>{{ fingerprint_result.features.spectral_centroid | round(2) }} Hz</td></tr>
-                <tr><td>Spectral Rolloff</td><td>{{ fingerprint_result.features.spectral_rolloff | round(2) }} Hz</td></tr>
-                <tr><td>Zero Crossing Rate</td><td>{{ fingerprint_result.features.zcr | round(4) }}</td></tr>
-                <tr><td>Duration</td><td>{{ fingerprint_result.features.duration | round(2) }} sec</td></tr>
+                {% if fingerprint_result.features %}
+                    <tr><td>Tempo</td><td>{{ fingerprint_result.features.tempo | round(2) }} BPM</td></tr>
+                    <tr><td>Spectral Centroid</td><td>{{ fingerprint_result.features.spectral_centroid | round(2) }} Hz</td></tr>
+                    <tr><td>Spectral Rolloff</td><td>{{ fingerprint_result.features.spectral_rolloff | round(2) }} Hz</td></tr>
+                    <tr><td>Zero Crossing Rate</td><td>{{ fingerprint_result.features.zcr | round(4) }}</td></tr>
+                    <tr><td>Duration</td><td>{{ fingerprint_result.features.duration | round(2) }} sec</td></tr>
+                {% else %}
+                    <tr><td colspan="2">No feature data available</td></tr>
+                {% endif %}
             </tbody>
         </table>
         <h3>Visualizations</h3>
