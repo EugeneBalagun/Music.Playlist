@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Регистрация{% endblock %}
+{% block title %}Реєстрація{% endblock %}
 {% block content %}
-    <h1>Регистрация</h1>
+    <h1>Реєстрація</h1>
     <form method="POST">
         <div>
-            <label>Имя пользователя:</label><br>
+            <label>Ім'я користувача:</label><br>
             <input type="text" name="username" required>
         </div>
         <div>
@@ -12,8 +12,8 @@
             <input type="password" name="password" required>
         </div>
         <div>
-            <button type="submit">Зарегистрироваться</button>
+            <button type="submit">Зареєструватися</button>
         </div>
     </form>
-    <p>Уже есть аккаунт? <a href="{{ url_for('login') }}">Войти</a></p>
+    <p>Вже є акаунт? <a href="{{ url_for('login') }}">Увійти</a></p>
 {% endblock %}

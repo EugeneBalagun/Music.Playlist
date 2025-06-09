@@ -1,77 +1,75 @@
 {% extends "base.html" %}
-{% block title %}Song Processing: {{ song.name }}{% endblock %}
+{% block title %}Обробка пісні: {{ song.name }}{% endblock %}
 {% block content %}
-    <h1>Song Processing: {{ song.name }}</h1>
+    <h1>Обробка пісні: {{ song.name }}</h1>
 
-    <!-- Processing Form -->
     <div class="processing-form">
-        <h2>Processing Settings</h2>
+        <h2>Налаштування обробки</h2>
         <form method="POST" action="{{ url_for('song_processing', song_id=song.id) }}">
             {% if not song.file_path %}
-                <button type="submit" name="action" value="download">Download Song</button>
+                <button type="submit" name="action" value="download">Завантажити пісню</button>
             {% else %}
-                <button type="submit" name="action" value="analyze">Analyze</button>
-                <button type="submit" name="action" value="fingerprint">Create Fingerprint</button>
-                <h3>Tempo Adjustment</h3>
-                <label for="tempo_semitones">Semitones:</label>
+                <button type="submit" name="action" value="analyze">Аналізувати</button>
+                <button type="submit" name="action" value="fingerprint">Створити відбиток</button>
+                <h3>Налаштування темпу</h3>
+                <label for="tempo_semitones">Півтони:</label>
                 <select name="tempo_semitones" id="tempo_semitones">
-                    <option value="-4">-4 semitones</option>
-                    <option value="-3">-3 semitones</option>
-                    <option value="-2">-2 semitones</option>
-                    <option value="-1">-1 semitone</option>
-                    <option value="1">+1 semitone</option>
-                    <option value="2">+2 semitones</option>
-                    <option value="3">+3 semitones</option>
-                    <option value="4">+4 semitones</option>
+                    <option value="-4">-4 півтони</option>
+                    <option value="-3">-3 півтони</option>
+                    <option value="-2">-2 півтони</option>
+                    <option value="-1">-1 півтон</option>
+                    <option value="1">+1 півтон</option>
+                    <option value="2">+2 півтони</option>
+                    <option value="3">+3 півтони</option>
+                    <option value="4">+4 півтони</option>
                 </select>
-                <label>Methods:</label>
-                <input type="checkbox" name="tempo_methods" value="standard" checked> Standard
-                <input type="checkbox" name="tempo_methods" value="custom" checked> Custom
-                <button type="submit" name="action" value="process">Process</button>
+                <label>Методи:</label>
+                <input type="checkbox" name="tempo_methods" value="standard" checked> Стандартний
+                <input type="checkbox" name="tempo_methods" value="custom" checked> Користувацький
+                <button type="submit" name="action" value="process">Обробити</button>
             {% endif %}
         </form>
     </div>
 
-    <!-- Fingerprint Result -->
     {% if fingerprint_result and fingerprint_result.fingerprint_path %}
-        <h2>Fingerprint Result</h2>
-        <p><strong>Fingerprint created:</strong> {{ fingerprint_result.fingerprint_path | basename }}</p>
-        <p><strong>Number of peaks:</strong> {{ fingerprint_result.fingerprint_count }}</p>
-        <h3>Fingerprint Features</h3>
+        <h2>Результати відбитка</h2>
+        <p><strong>Відбиток створено:</strong> {{ fingerprint_result.fingerprint_path | basename }}</p>
+        <p><strong>Кількість піків:</strong> {{ fingerprint_result.fingerprint_count }}</p>
+        <h3>Характеристики відбитка</h3>
         <table>
             <thead>
                 <tr>
-                    <th>Metric</th>
-                    <th>Value</th>
+                    <th>Метрика</th>
+                    <th>Значення</th>
                 </tr>
             </thead>
             <tbody>
                 {% if fingerprint_result.features %}
-                    <tr><td>Tempo</td><td>{{ fingerprint_result.features.tempo | round(2) }} BPM</td></tr>
-                    <tr><td>Spectral Centroid</td><td>{{ fingerprint_result.features.spectral_centroid | round(2) }} Hz</td></tr>
-                    <tr><td>Spectral Rolloff</td><td>{{ fingerprint_result.features.spectral_rolloff | round(2) }} Hz</td></tr>
-                    <tr><td>Zero Crossing Rate</td><td>{{ fingerprint_result.features.zcr | round(4) }}</td></tr>
-                    <tr><td>Duration</td><td>{{ fingerprint_result.features.duration | round(2) }} sec</td></tr>
+                    <tr><td>Темп</td><td>{{ fingerprint_result.features.tempo | round(2) }} BPM</td></tr>
+                    <tr><td>Спектральний центроїд</td><td>{{ fingerprint_result.features.spectral_centroid | round(2) }} Гц</td></tr>
+                    <tr><td>Спектральний спад</td><td>{{ fingerprint_result.features.spectral_rolloff | round(2) }} Гц</td></tr>
+                    <tr><td>Частота переходів через нуль</td><td>{{ fingerprint_result.features.zcr | round(4) }}</td></tr>
+                    <tr><td>Тривалість</td><td>{{ fingerprint_result.features.duration | round(2) }} сек</td></tr>
                 {% else %}
-                    <tr><td colspan="2">No feature data available</td></tr>
+                    <tr><td colspan="2">Дані про характеристики відсутні</td></tr>
                 {% endif %}
             </tbody>
         </table>
-        <h3>Visualizations</h3>
+        <h3>Візуалізації</h3>
         <div class="visualizations-grid">
             {% if fingerprint_result.scatter_plot_path %}
                 <div class="visualization-card">
-                    <h4>Spectral Peaks Scatter Plot</h4>
+                    <h4>Точковий графік спектральних піків</h4>
                     <div class="scatter-plot-container">
-                        <img src="{{ url_for('serve_song_processing_file', filename=fingerprint_result.scatter_plot_path | basename) }}" alt="Spectral Peaks" class="scatter-plot-img">
+                        <img src="{{ url_for('serve_song_processing_file', filename=fingerprint_result.scatter_plot_path | basename) }}" alt="Спектральні піки" class="scatter-plot-img">
                     </div>
                 </div>
             {% endif %}
             {% if fingerprint_result.chromagram_path %}
                 <div class="visualization-card">
-                    <h4>Chromagram</h4>
+                    <h4>Хромаграма</h4>
                     <div class="chromagram-container">
-                        <img src="{{ url_for('serve_song_processing_file', filename=fingerprint_result.chromagram_path | basename) }}" alt="Chromagram" class="chromagram-img">
+                        <img src="{{ url_for('serve_song_processing_file', filename=fingerprint_result.chromagram_path | basename) }}" alt="Хромаграма" class="chromagram-img">
                     </div>
                 </div>
             {% endif %}
@@ -84,54 +82,52 @@
                 </div>
             {% endif %}
         </div>
-        <p><strong>Normality Test:</strong> Check logs for Shapiro-Wilk test results (p-value). If p < 0.05, percentile threshold was used; otherwise, adaptive threshold based on normal distribution.</p>
+        <p><strong>Тест на нормальність:</strong> Перевірте логи для результатів тесту Шапіро-Вілка (p-значення). Якщо p < 0.05, використано пороговий перцентиль; інакше — адаптивний поріг на основі нормального розподілу.</p>
     {% endif %}
 
-    <!-- Analysis Results -->
     {% if analysis_result %}
-        <h2>Analysis Results</h2>
+        <h2>Результати аналізу</h2>
         {% if song.file_path and song.spectrogram_path %}
-            <p><a href="{{ url_for('song_player', song_id=song.id) }}">Open in Interactive Player</a></p>
+            <p><a href="{{ url_for('song_player', song_id=song.id) }}">Відкрити в інтерактивному програвачі</a></p>
         {% endif %}
         <details>
-            <summary>Full Report</summary>
+            <summary>Повний звіт</summary>
             <pre>{{ analysis_result.report_content }}</pre>
         </details>
         <div class="visualizations">
-            <h3>Spectrogram</h3>
+            <h3>Спектрограма</h3>
             {% if analysis_result.spectrogram_path %}
                 <div class="spectrogram-container">
-                    <img src="{{ url_for('serve_song_processing_file', filename=analysis_result.spectrogram_path | basename) }}" alt="Spectrogram" class="spectrogram-img">
+                    <img src="{{ url_for('serve_song_processing_file', filename=analysis_result.spectrogram_path | basename) }}" alt="Спектрограма" class="spectrogram-img">
                 </div>
             {% endif %}
         </div>
     {% endif %}
 
-    <!-- Tempo Adjustment Results -->
     {% if tempo_shift_results %}
-        <h2>Tempo Adjustment Results</h2>
+        <h2>Результати налаштування темпу</h2>
         <div class="results-grid">
             {% for result in tempo_shift_results %}
                 <div class="result-card">
                     <h3>{{ result.method }}</h3>
                     <audio controls>
                         <source src="{{ url_for('serve_song_processing_file', filename=result.audio_path | basename) }}" type="audio/mpeg">
-                        Your browser does not support the audio element.
+                        Ваш браузер не підтримує елемент audio.
                     </audio>
-                    <p><a href="{{ url_for('serve_song_processing_file', filename=result.audio_path | basename) }}">Download Track</a></p>
+                    <p><a href="{{ url_for('serve_song_processing_file', filename=result.audio_path | basename) }}">Завантажити трек</a></p>
                     <details>
-                        <summary>Spectrogram</summary>
+                        <summary>Спектрограма</summary>
                         <div class="spectrogram-container">
-                            <img src="{{ url_for('serve_song_processing_file', filename=result.spectrogram_path | basename) }}" alt="Spectrogram {{ result.method }}" class="spectrogram-img">
+                            <img src="{{ url_for('serve_song_processing_file', filename=result.spectrogram_path | basename) }}" alt="Спектрограма {{ result.method }}" class="spectrogram-img">
                         </div>
                     </details>
                     {% if metrics[result.method] %}
-                        <p><strong>MFCC Correlation:</strong> {{ metrics[result.method].mfcc_correlation | round(4) }}</p>
+                        <p><strong>Кореляція MFCC:</strong> {{ metrics[result.method].mfcc_correlation | round(4) }}</p>
                         {% if result.method != 'Original' %}
-                            <p><strong>Spectral Centroid Difference:</strong> {{ metrics[result.method].spectral_centroid_diff | round(2) }} Hz</p>
-                            <p><strong>RMS Difference:</strong> {{ metrics[result.method].rms_diff | round(4) }}</p>
+                            <p><strong>Різниця в спектральному центроїді:</strong> {{ metrics[result.method].spectral_centroid_diff | round(2) }} Гц</p>
+                            <p><strong>Різниця в RMS:</strong> {{ metrics[result.method].rms_diff | round(4) }}</p>
                         {% else %}
-                            <p><strong>Spectral Centroid:</strong> {{ metrics[result.method].spectral_centroid | round(2) }} Hz</p>
+                            <p><strong>Спектральний центроїд:</strong> {{ metrics[result.method].spectral_centroid | round(2) }} Гц</p>
                             <p><strong>RMS:</strong> {{ metrics[result.method].rms | round(4) }}</p>
                         {% endif %}
                     {% endif %}
@@ -139,29 +135,29 @@
             {% endfor %}
         </div>
         {% if metrics.Standard and metrics.Custom %}
-            <h3>Comparison of Methods (Standard vs Custom)</h3>
-            <p><strong>Description:</strong> The Custom method uses a more precise ratio (K=22885686008, N=39123338641) for tempo adjustment, minimizing error to less than 0.0000001% compared to the Standard method (K=7, N=12), which has an error of about 0.2%. This ensures more natural sound and better harmonic preservation.</p>
+            <h3>Порівняння методів (Стандартний vs Користувацький)</h3>
+            <p><strong>Опис:</strong> Користувацький метод використовує точніше співвідношення (K=22885686008, N=39123338641) для налаштування темпу, мінімізуючи похибку до менше ніж 0.0000001% порівняно зі стандартним методом (K=7, N=12), який має похибку близько 0.2%. Це забезпечує природніше звучання та краще збереження гармонік.</p>
             <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
                 <tr style="background-color: #f2f2f2;">
-                    <th style="border: 1px solid #ddd; padding: 8px;">Metric</th>
-                    <th style="border: 1px solid #ddd; padding: 8px;">Standard</th>
-                    <th style="border: 1px solid #ddd; padding: 8px;">Custom</th>
-                    <th style="border: 1px solid #ddd; padding: 8px;">Difference</th>
+                    <th style="border: 1px solid #ddd; padding: 8px;">Метрика</th>
+                    <th style="border: 1px solid #ddd; padding: 8px;">Стандартний</th>
+                    <th style="border: 1px solid #ddd; padding: 8px;">Користувацький</th>
+                    <th style="border: 1px solid #ddd; padding: 8px;">Різниця</th>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ddd; padding: 8px;">MFCC Correlation</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">Кореляція MFCC</td>
                     <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Standard.mfcc_correlation | round(4) }}</td>
                     <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Custom.mfcc_correlation | round(4) }}</td>
                     <td style="border: 1px solid #ddd; padding: 8px;">{{ (metrics.Standard.mfcc_correlation - metrics.Custom.mfcc_correlation) | abs | round(6) }}</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ddd; padding: 8px;">Spectral Centroid Difference (Hz)</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">Різниця в спектральному центроїді (Гц)</td>
                     <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Standard.spectral_centroid_diff | round(2) }}</td>
                     <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Custom.spectral_centroid_diff | round(2) }}</td>
                     <td style="border: 1px solid #ddd; padding: 8px;">{{ (metrics.Standard.spectral_centroid_diff - metrics.Custom.spectral_centroid_diff) | abs | round(2) }}</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ddd; padding: 8px;">RMS Difference</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">Різниця в RMS</td>
                     <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Standard.rms_diff | round(4) }}</td>
                     <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Custom.rms_diff | round(4) }}</td>
                     <td style="border: 1px solid #ddd; padding: 8px;">{{ (metrics.Standard.rms_diff - metrics.Custom.rms_diff) | abs | round(4) }}</td>
@@ -170,7 +166,7 @@
         {% endif %}
     {% endif %}
 
-    <p><a href="{{ url_for('playlists_page') }}">Return to Playlists</a></p>
+    <p><a href="{{ url_for('playlists_page') }}">Повернутися до плейлистів</a></p>
 
     <style>
         .processing-form {

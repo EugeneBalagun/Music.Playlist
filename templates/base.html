@@ -1,12 +1,10 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="dark">
+<html lang="uk" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
-    <!-- Подключаем PicoCSS с тёмной темой -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-    <!-- Подключаем иконки (Font Awesome для простоты) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         .container {
@@ -15,12 +13,11 @@
             padding: 20px;
         }
         a {
-            color: #1db954; /* Зелёный акцент как у Spotify */
+            color: #1db954;
         }
         a:hover {
             color: #179444;
         }
-        /* Стили для гармошки */
         details {
             margin-bottom: 10px;
             background-color: #2a2a2a;
@@ -37,19 +34,18 @@
             background-color: #333;
         }
         summary::marker, summary::-webkit-details-marker {
-            display: none; /* Убираем стандартную стрелку */
+            display: none;
         }
         summary::before {
-            content: "\f0da"; /* Иконка стрелки вправо от Font Awesome */
+            content: "\f0da";
             font-family: "Font Awesome 6 Free";
             font-weight: 900;
             margin-right: 10px;
             color: #1db954;
         }
         details[open] summary::before {
-            content: "\f0d7"; /* Иконка стрелки вниз при раскрытии */
+            content: "\f0d7";
         }
-        /* Стили для кнопок */
         button, input[type="submit"] {
             background-color: #1db954;
             color: #fff;
@@ -62,7 +58,6 @@
         button:hover, input[type="submit"]:hover {
             background-color: #179444;
         }
-        /* Улучшаем читаемость вложенного контента */
         details div {
             padding: 10px 20px;
             background-color: #333;
@@ -74,7 +69,7 @@
     <main class="container">
         <header>
             {% if current_user.is_authenticated %}
-                <p>Привет, {{ current_user.username }}! <a href="{{ url_for('logout') }}">Выйти</a></p>
+                <p>Привіт, {{ current_user.username }}! <a href="{{ url_for('logout') }}">Вийти</a></p>
             {% endif %}
         </header>
 

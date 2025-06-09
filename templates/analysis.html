@@ -1,20 +1,20 @@
 {% extends "base.html" %}
-{% block title %}Анализ песни: {{ song.name }}{% endblock %}
+{% block title %}Аналіз пісні: {{ song.name }}{% endblock %}
 {% block content %}
-<h1>Анализ песни: {{ song.name }}</h1>
+<h1>Аналіз пісні: {{ song.name }}</h1>
 
-<h2>Полный отчёт</h2>
+<h2>Повний звіт</h2>
 <pre>{{ report_content }}</pre>
 
-<h2>Визуализации</h2>
+<h2>Візуалізації</h2>
 {% if images %}
     {% for image in images %}
         <h3>{{ image.title }}</h3>
         <img src="{{ url_for('serve_analysis_file', filename=image.path | basename) }}" alt="{{ image.title }}" style="max-width: 100%;">
     {% endfor %}
 {% else %}
-    <p>Визуализации отсутствуют.</p>
+    <p>Візуалізації відсутні.</p>
 {% endif %}
 
-<p><a href="{{ url_for('playlists_page') }}">Вернуться к плейлистам</a></p>
+<p><a href="{{ url_for('playlists_page') }}">Повернутися до плейлистів</a></p>
 {% endblock %}

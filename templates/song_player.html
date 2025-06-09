@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Проигрыватель: {{ song.name }}{% endblock %}
+{% block title %}Програвач: {{ song.name }}{% endblock %}
 {% block content %}
-<h1>Проигрыватель: {{ song.name }}</h1>
+<h1>Програвач: {{ song.name }}</h1>
 
 <div class="player-container">
     <div class="spectrogram-container">
@@ -10,20 +10,20 @@
     <div class="controls">
         <audio id="audioPlayer" controls>
             <source src="{{ url_for('serve_song_processing_file', filename=song.file_path | basename) }}" type="audio/mpeg">
-            Ваш браузер не поддерживает элемент audio.
+            Ваш браузер не підтримує елемент audio.
         </audio>
         <div class="time-display">
             <span id="currentTime">00:00</span> / <span id="duration">{{ (song.duration | round(0)) | format_time }}</span>
         </div>
         <input type="range" id="seekSlider" min="0" max="1000" value="0">
         <div class="zoom-controls">
-            <button id="zoomIn">Zoom In</button>
-            <button id="zoomOut">Zoom Out</button>
+            <button id="zoomIn">Збільшити</button>
+            <button id="zoomOut">Зменшити</button>
         </div>
     </div>
 </div>
-<p><a href="{{ url_for('song_processing', song_id=song.id) }}">Вернуться к обработке</a></p>
-<p><a href="{{ url_for('playlists_page') }}">Вернуться к плейлистам</a></p>
+<p><a href="{{ url_for('song_processing', song_id=song.id) }}">Повернутися до обробки</a></p>
+<p><a href="{{ url_for('playlists_page') }}">Повернутися до плейлистів</a></p>
 
 <style>
     .player-container {

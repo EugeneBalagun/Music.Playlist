@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Сравнение изменения темпа: {{ song.name }}{% endblock %}
+{% block title %}Порівняння зміни темпу: {{ song.name }}{% endblock %}
 {% block content %}
-<h1>Сравнение изменения темпа: {{ song.name }}</h1>
+<h1>Порівняння зміни темпу: {{ song.name }}</h1>
 
-<h2>Обработанные треки</h2>
+<h2>Оброблені треки</h2>
 {% if results %}
     <div style="display: flex; flex-wrap: wrap; gap: 20px;">
         {% for result in results %}
@@ -11,20 +11,20 @@
                 <h3>{{ result.method }}</h3>
                 <audio controls>
                     <source src="{{ url_for('serve_tempo_shift_file', filename=result.audio_path | basename) }}" type="audio/mpeg">
-                    Ваш браузер не поддерживает элемент audio.
+                    Ваш браузер не підтримує елемент audio.
                 </audio>
-                <p><a href="{{ url_for('serve_tempo_shift_file', filename=result.audio_path | basename) }}">Скачать трек</a></p>
-                <h4>Спектрограмма</h4>
-                <img src="{{ url_for('serve_tempo_shift_file', filename=result.spectrogram_path | basename) }}" alt="Спектрограмма {{ result.method }}" style="max-width: 100%;">
-                <h4>Хромаграмма</h4>
-                <img src="{{ url_for('serve_tempo_shift_file', filename=result.chromagram_path | basename) }}" alt="Хромаграмма {{ result.method }}" style="max-width: 100%;">
+                <p><a href="{{ url_for('serve_tempo_shift_file', filename=result.audio_path | basename) }}">Завантажити трек</a></p>
+                <h4>Спектрограма</h4>
+                <img src="{{ url_for('serve_tempo_shift_file', filename=result.spectrogram_path | basename) }}" alt="Спектрограма {{ result.method }}" style="max-width: 100%;">
+                <h4>Хромаграма</h4>
+                <img src="{{ url_for('serve_tempo_shift_file', filename=result.chromagram_path | basename) }}" alt="Хромаграма {{ result.method }}" style="max-width: 100%;">
                 {% if metrics[result.method] %}
-                    <p><strong>Корреляция MFCC с оригиналом:</strong> {{ metrics[result.method].mfcc_correlation | round(4) }}</p>
+                    <p><strong>Кореляція MFCC з оригіналом:</strong> {{ metrics[result.method].mfcc_correlation | round(4) }}</p>
                     {% if result.method != 'Original' %}
-                        <p><strong>Разница в спектральном центроиде:</strong> {{ metrics[result.method].spectral_centroid_diff | round(2) }} Гц</p>
-                        <p><strong>Разница в RMS:</strong> {{ metrics[result.method].rms_diff | round(4) }}</p>
+                        <p><strong>Різниця в спектральному центроїді:</strong> {{ metrics[result.method].spectral_centroid_diff | round(2) }} Гц</p>
+                        <p><strong>Різниця в RMS:</strong> {{ metrics[result.method].rms_diff | round(4) }}</p>
                     {% else %}
-                        <p><strong>Спектральный центроид:</strong> {{ metrics[result.method].spectral_centroid | round(2) }} Гц</p>
+                        <p><strong>Спектральний центроїд:</strong> {{ metrics[result.method].spectral_centroid | round(2) }} Гц</p>
                         <p><strong>RMS:</strong> {{ metrics[result.method].rms | round(4) }}</p>
                     {% endif %}
                 {% endif %}
@@ -32,49 +32,49 @@
         {% endfor %}
     </div>
 
-    <h2>Сравнение методов: Стандартный vs Ваш</h2>
+    <h2>Порівняння методів: Стандартний vs Користувацький</h2>
     {% if metrics.Standard and metrics.Custom %}
-        <p><strong>Описание:</strong> Ваш метод использует более точное соотношение (K=22885686008, N=39123338641) для сдвига темпа, что минимизирует погрешность до менее чем 0.0000001% по сравнению со стандартным методом (K=7, N=12), который имеет погрешность около 0.2%. Это обеспечивает более естественное звучание и лучшее сохранение гармоник.</p>
+        <p><strong>Опис:</strong> Користувацький метод використовує точніше співвідношення (K=22885686008, N=39123338641) для зміни темпу, що мінімізує похибку до менше ніж 0.0000001% порівняно зі стандартним методом (K=7, N=12), який має похибку близько 0.2%. Це забезпечує природніше звучання та краще збереження гармонік.</p>
         <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
             <tr style="background-color: #f2f2f2;">
                 <th style="border: 1px solid #ddd; padding: 8px;">Метрика</th>
-                <th style="border: 1px solid #ddd; padding: 8px;">Стандартный</th>
-                <th style="border: 1px solid #ddd; padding: 8px;">Ваш метод</th>
-                <th style="border: 1px solid #ddd; padding: 8px;">Разница</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">Стандартний</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">Користувацький</th>
+                <th style="border: 1px solid #ddd; padding: 8px;">Різниця</th>
             </tr>
             <tr>
-                <td style="border: 1px solid #ddd; padding: 8px;">Корреляция MFCC с оригиналом</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">Кореляція MFCC з оригіналом</td>
                 <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Standard.mfcc_correlation | round(4) }}</td>
                 <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Custom.mfcc_correlation | round(4) }}</td>
                 <td style="border: 1px solid #ddd; padding: 8px;">{{ (metrics.Standard.mfcc_correlation - metrics.Custom.mfcc_correlation) | abs | round(6) }}</td>
             </tr>
             <tr>
-                <td style="border: 1px solid #ddd; padding: 8px;">Разница в спектральном центроиде (Гц)</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">Різниця в спектральному центроїді (Гц)</td>
                 <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Standard.spectral_centroid_diff | round(2) }}</td>
                 <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Custom.spectral_centroid_diff | round(2) }}</td>
                 <td style="border: 1px solid #ddd; padding: 8px;">{{ (metrics.Standard.spectral_centroid_diff - metrics.Custom.spectral_centroid_diff) | abs | round(2) }}</td>
             </tr>
             <tr>
-                <td style="border: 1px solid #ddd; padding: 8px;">Разница в RMS</td>
+                <td style="border: 1px solid #ddd; padding: 8px;">Різниця в RMS</td>
                 <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Standard.rms_diff | round(4) }}</td>
                 <td style="border: 1px solid #ddd; padding: 8px;">{{ metrics.Custom.rms_diff | round(4) }}</td>
                 <td style="border: 1px solid #ddd; padding: 8px;">{{ (metrics.Standard.rms_diff - metrics.Custom.rms_diff) | abs | round(4) }}</td>
             </tr>
         </table>
-        <p style="margin-top: 20px;"><strong>Вывод:</strong> Ваш метод демонстрирует более высокую корреляцию MFCC с оригинальным треком, меньшую разницу в спектральном центроиде и RMS, что указывает на лучшее сохранение качества звука и гармонической структуры.</p>
+        <p style="margin-top: 20px;"><strong>Висновок:</strong> Користувацький метод демонструє вищу кореляцію MFCC з оригінальним треком, меншу різницю в спектральному центроїді та RMS, що свідчить про краще збереження якості звуку та гармонійної структури.</p>
     {% else %}
-        <p>Для сравнения выполните изменение темпа обоими методами.</p>
+        <p>Для порівняння виконайте зміну темпу обома методами.</p>
     {% endif %}
 {% else %}
-    <p>Результаты изменения темпа отсутствуют. Выполните изменение темпа.</p>
+    <p>Результати зміни темпу відсутні. Виконайте зміну темпу.</p>
 {% endif %}
 
-<p><a href="{{ url_for('playlists_page') }}">Вернуться к плейлистам</a> |
+<p><a href="{{ url_for('playlists_page') }}">Повернутися до плейлистів</a> |
    {% if song.analysis_report_path %}
-       <a href="{{ url_for('view_analysis', song_id=song.id) }}">Анализ песни</a> |
+       <a href="{{ url_for('view_analysis', song_id=song.id) }}">Аналіз пісні</a> |
    {% endif %}
    {% if song.pitch_shifted_standard_path or song.pitch_shifted_custom_path %}
-       <a href="{{ url_for('pitch_shift_compare', song_id=song.id) }}">Питч-шифтинг</a>
+       <a href="{{ url_for('pitch_shift_compare', song_id=song.id) }}">Пітч-шифтинг</a>
    {% endif %}
 </p>
 

@@ -113,23 +113,6 @@ def get_genre_from_lastfm(track_name, artist_name):
 
 def create_fingerprint(file_path, song, sr=22050, n_fft=4096, hop_length=256, peak_height=-40,
                       peak_distance=10, peak_prominence=3, chunk_duration=10):
-    """
-    Creates audio fingerprints for a song by processing it in chunks and saves visualizations.
-
-    Args:
-        file_path (str): Path to the audio file.
-        song: Song object from the database.
-        sr (int): Sampling rate.
-        n_fft (int): FFT window size (increased to 4096 for better frequency resolution).
-        hop_length (int): Hop length for STFT (decreased to 256 for better time resolution).
-        peak_height (float): Minimum peak height in dB.
-        peak_distance (int): Minimum distance between peaks.
-        peak_prominence (float): Minimum peak prominence.
-        chunk_duration (int): Duration of each chunk in seconds (default: 10s).
-
-    Returns:
-        dict: Single fingerprint with all peaks and visualization paths.
-    """
     try:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Audio file not found: {file_path}")
@@ -318,22 +301,7 @@ def create_fingerprint(file_path, song, sr=22050, n_fft=4096, hop_length=256, pe
         raise
 
 def compare_fingerprints(fingerprint_path1, fingerprint_path2, song_id1, song_id2, force_recompute=False, sr=22050,hop_length=512, n_fft=2048):
-    """
-    Compares two audio fingerprints with normalization and caching.
 
-    Args:
-        fingerprint_path1 (str): Path to the first fingerprint file.
-        fingerprint_path2 (str): Path to the second fingerprint file.
-        song_id1 (int): ID of the first song.
-        song_id2 (int): ID of the second song.
-        force_recompute (bool): Whether to force recomputation.
-        sr (int): Sampling rate.
-        hop_length (int): Hop length for normalization.
-        n_fft (int): FFT window size for normalization.
-
-    Returns:
-        dict: Comparison results with similarity metrics.
-    """
     try:
         # Check cache
         if not force_recompute:
@@ -525,17 +493,7 @@ def compare_fingerprints(fingerprint_path1, fingerprint_path2, song_id1, song_id
 
 
 def validate_fingerprint(fingerprint, min_peaks=100, max_duration=600):
-    """
-    Validates the audio fingerprint.
 
-    Args:
-        fingerprint (dict): Fingerprint dictionary.
-        min_peaks (int): Minimum number of peaks.
-        max_duration (int): Maximum duration in seconds.
-
-    Returns:
-        tuple: (is_valid, validation_message)
-    """
     try:
         if len(fingerprint['peaks']) < min_peaks:
             return False, f"Too few peaks ({len(fingerprint['peaks'])} < {min_peaks})"
