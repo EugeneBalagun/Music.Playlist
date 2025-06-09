@@ -70,7 +70,7 @@
     </div>
 </div>
 
-<!-- Діаграми розсіювання спектральних піків -->
+<!-- Діаграми спектральних піків -->
 <h3>Діаграми спектральних піків</h3>
 <div class="grid">
     <div>
@@ -91,6 +91,69 @@
     </div>
 </div>
 
+<!-- Хромаграми -->
+<h3>Хромаграми</h3>
+<div class="grid">
+    <div>
+        <h4>{{ song1.name }}</h4>
+        {% if song1.chromagram_path and song1.chromagram_path|basename %}
+            <img src="{{ url_for('serve_song_processing_file', filename=song1.chromagram_path|basename) }}" alt="Хромаграма для {{ song1.name }}" class="chromagram-img">
+        {% else %}
+            <p>Хромаграма недоступна. Будь ласка, спочатку створіть фінгерпринт.</p>
+        {% endif %}
+    </div>
+    <div>
+        <h4>{{ song2.name }}</h4>
+        {% if song2.chromagram_path and song2.chromagram_path|basename %}
+            <img src="{{ url_for('serve_song_processing_file', filename=song2.chromagram_path|basename) }}" alt="Хромаграма для {{ song2.name }}" class="chromagram-img">
+        {% else %}
+            <p>Хромаграма недоступна. Будь ласка, спочатку створіть фінгерпринт.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- MFCC -->
+<h3>MFCC</h3>
+<div class="grid">
+    <div>
+        <h4>{{ song1.name }}</h4>
+        {% if song1.mfcc_path and song1.mfcc_path|basename %}
+            <img src="{{ url_for('serve_song_processing_file', filename=song1.mfcc_path|basename) }}" alt="MFCC для {{ song1.name }}" class="mfcc-img">
+        {% else %}
+            <p>MFCC недоступний. Будь ласка, спочатку створіть фінгерпринт.</p>
+        {% endif %}
+    </div>
+    <div>
+        <h4>{{ song2.name }}</h4>
+        {% if song2.mfcc_path and song2.mfcc_path|basename %}
+            <img src="{{ url_for('serve_song_processing_file', filename=song2.mfcc_path|basename) }}" alt="MFCC для {{ song2.name }}" class="mfcc-img">
+        {% else %}
+            <p>MFCC недоступний. Будь ласка, спочатку створіть фінгерпринт.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Візуалізації порівняння -->
+<h3>Візуалізації порівняння</h3>
+<div class="grid">
+    {% if similarity_plot %}
+        <div>
+            <h4>Гістограма схожості</h4>
+            <img src="{{ url_for('serve_song_processing_file', filename=similarity_plot|basename) }}" alt="Гістограма схожості" class="similarity-plot-img">
+        </div>
+    {% else %}
+        <p>Гістограма схожості недоступна.</p>
+    {% endif %}
+    {% if feature_plot %}
+        <div>
+            <h4>Порівняння MFCC та хроми</h4>
+            <img src="{{ url_for('serve_song_processing_file', filename=feature_plot|basename) }}" alt="Порівняння MFCC та хроми" class="feature-plot-img">
+        </div>
+    {% else %}
+        <p>Графік порівняння MFCC та хроми недоступний.</p>
+    {% endif %}
+</div>
+
 <!-- Таблиця детального порівняння -->
 <h3>Детальне порівняння</h3>
 <table>
@@ -107,68 +170,32 @@
                 <span class="tooltip" data-tooltip='{% filter safe %}
                     {% if metric == "Spectral Peaks" %}
                         <strong>Спектральні піки</strong><br>
-                        Показує схожість частотних піків за допомогою DTW. Висока схожість вказує на подібний частотний вміст.<br>
-                        <em>Формула:</em> 100 * (1 - DTW_distance / max_peaks).
+                        Показує схожість частотних піків за допомогою FastDTW. Висока схожість вказує на подібний частотний вміст.<br>
+                        <em>Формула:</em> 100 * (1 - DTW_distance / max_distance) * 1.2
+                    {% elif metric == "MFCC" %}
+                        <strong>Мел-частотні кепстральні коефіцієнти (MFCC)</strong><br>
+                        Порівнює тембральні характеристики за допомогою евклідової відстані.<br>
+                        <em>Формула:</em> 100 * (1 - euclidean_distance / (std1 + std2))
+                    {% elif metric == "Chroma" %}
+                        <strong>Хроматична кореляція</strong><br>
+                        Порівнює розподіл енергії по нотах за допомогою косинусної відстані.<br>
+                        <em>Формула:</em> 100 * (1 - cosine_distance / 2)
                     {% elif metric == "Tempo" %}
                         <strong>Темп</strong><br>
                         Порівнює середній темп пісень у BPM.<br>
-                        <em>Формула:</em> 100 * (1 - |BPM1 - BPM2| / max(BPM1, BPM2)).
+                        <em>Формула:</em> 100 * (1 - |BPM1 - BPM2| / max(BPM1, BPM2))
                     {% elif metric == "Spectral Centroid" %}
                         <strong>Спектральний центроїд</strong><br>
                         Порівнює середню частоту спектра (яскравість звуку).<br>
-                        <em>Формула:</em> 100 * (1 - |SC1 - SC2| / max(SC1, SC2)).
+                        <em>Формула:</em> 100 * (1 - |SC1 - SC2| / max(SC1, SC2))
                     {% elif metric == "Spectral Rolloff" %}
                         <strong>Спектральний спад</strong><br>
                         Порівнює частоту, нижче якої зосереджено 85% спектральної енергії.<br>
-                        <em>Формула:</em> 100 * (1 - |SR1 - SR2| / max(SR1, SR2)).
-                    {% elif metric == "Spectral Bandwidth" %}
-                        <strong>Спектральна ширина</strong><br>
-                        Порівнює ширину спектральної енергії.<br>
-                        <em>Формула:</em> 100 * (1 - |SB1 - SB2| / max(SB1, SB2)).
-                    {% elif metric == "Spectral Contrast" %}
-                        <strong>Спектральний контраст</strong><br>
-                        Порівнює контрастність спектра, що відображає різницю між піками і долинами.<br>
-                        <em>Формула:</em> 100 * (1 - |SC1 - SC2| / max(SC1, SC2)).
-                    {% elif metric == "Spectral Flatness" %}
-                        <strong>Спектральна рівність</strong><br>
-                        Порівнює рівність спектра, що вказує на шумовість звуку.<br>
-                        <em>Формула:</em> 100 * (1 - |SF1 - SF2| / max(SF1, SF2)).
-                    {% elif metric == "Segment MFCC" %}
-                        <strong>Мел-частотні кепстральні коефіцієнти (MFCC)</strong><br>
-                        Порівнює тембральні характеристики через DTW.<br>
-                        <em>Формула:</em> 100 * (1 - mean(DTW_distance) / 20).
-                    {% elif metric == "Segment Chroma" %}
-                        <strong>Хроматична кореляція</strong><br>
-                        Порівнює розподіл енергії по нотах через DTW.<br>
-                        <em>Формула:</em> 100 * (1 - mean(DTW_distance) / 5).
-                    {% elif metric == "RMS" %}
-                        <strong>Середньоквадратична амплітуда (RMS)</strong><br>
-                        Порівнює середню гучність.<br>
-                        <em>Формула:</em> 100 * (1 - |RMS1 - RMS2| / max(RMS1, RMS2)).
-                    {% elif metric == "RMS Variance" %}
-                        <strong>Дисперсія RMS</strong><br>
-                        Порівнює мінливість гучності.<br>
-                        <em>Формула:</em> 100 * (1 - |RV1 - RV2| / max(RV1, RV2)).
-                    {% elif metric == "Onset Count" %}
-                        <strong>Кількість звукових подій</strong><br>
-                        Порівнює кількість звукових подій.<br>
-                        <em>Формула:</em> 100 * (1 - |OC1 - OC2| / max(OC1, OC2)).
-                    {% elif metric == "Rhythmic Complexity" %}
-                        <strong>Ритмічна складність</strong><br>
-                        Порівнює стандартне відхилення інтервалів між подіями.<br>
-                        <em>Формула:</em> 100 * (1 - |RC1 - RC2| / max(RC1, RC2)).
+                        <em>Формула:</em> 100 * (1 - |SR1 - SR2| / max(SR1, SR2))
                     {% elif metric == "Zero Crossing Rate" %}
                         <strong>Частота перетину нуля</strong><br>
                         Порівнює частоту зміни знаку сигналу.<br>
-                        <em>Формула:</em> 100 * (1 - |ZCR1 - ZCR2| / max(ZCR1, ZCR2)).
-                    {% elif metric == "Segment Count" %}
-                        <strong>Кількість сегментів</strong><br>
-                        Порівнює кількість унікальних сегментів.<br>
-                        <em>Формула:</em> 100 * (1 - |SC1 - SC2| / max(SC1, SC2)).
-                    {% elif metric == "Spectral Entropy" %}
-                        <strong>Спектральна ентропія</strong><br>
-                        Порівнює складність спектра.<br>
-                        <em>Формула:</em> 100 * (1 - |SE1 - SE2| / max(SE1, SE2)).
+                        <em>Формула:</em> 100 * (1 - |ZCR1 - ZCR2| / max(ZCR1, ZCR2))
                     {% endif %}
                 {% endfilter %}'>{{ metric }}</span>
             </td>
@@ -194,17 +221,9 @@
     .mb-2 {
         margin-bottom: 16px;
     }
-    .spectrogram-img {
+    .spectrogram-img, .scatter-plot-img, .chromagram-img, .mfcc-img, .similarity-plot-img, .feature-plot-img {
         width: 100%;
-        max-width: 800px; /* Збільшуємо максимальну ширину */
-        height: auto;
-        border: 1px solid #ddd;
-        display: block;
-        margin: 0 auto;
-    }
-    .scatter-plot-img {
-        width: 100%;
-        max-width: 1200px; /* Увеличиваем максимальную ширину для лучшей видимости */
+        max-width: 800px;
         height: auto;
         border: 1px solid #ddd;
         display: block;

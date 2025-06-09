@@ -37,14 +37,49 @@
         <h2>Fingerprint Result</h2>
         <p><strong>Fingerprint created:</strong> {{ fingerprint_result.fingerprint_path | basename }}</p>
         <p><strong>Number of peaks:</strong> {{ fingerprint_result.fingerprint_count }}</p>
-        {% if fingerprint_result.scatter_plot_path %}
-            <h3>Spectral Peaks Scatter Plot</h3>
-            <div class="scatter-plot-container">
-                <object type="image/svg+xml" data="{{ url_for('serve_song_processing_file', filename=fingerprint_result.scatter_plot_path | basename) }}" class="scatter-plot-svg">
-                    Your browser does not support SVG.
-                </object>
-            </div>
-        {% endif %}
+        <h3>Fingerprint Features</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Tempo</td><td>{{ fingerprint_result.features.tempo | round(2) }} BPM</td></tr>
+                <tr><td>Spectral Centroid</td><td>{{ fingerprint_result.features.spectral_centroid | round(2) }} Hz</td></tr>
+                <tr><td>Spectral Rolloff</td><td>{{ fingerprint_result.features.spectral_rolloff | round(2) }} Hz</td></tr>
+                <tr><td>Zero Crossing Rate</td><td>{{ fingerprint_result.features.zcr | round(4) }}</td></tr>
+                <tr><td>Duration</td><td>{{ fingerprint_result.features.duration | round(2) }} sec</td></tr>
+            </tbody>
+        </table>
+        <h3>Visualizations</h3>
+        <div class="visualizations-grid">
+            {% if fingerprint_result.scatter_plot_path %}
+                <div class="visualization-card">
+                    <h4>Spectral Peaks Scatter Plot</h4>
+                    <div class="scatter-plot-container">
+                        <img src="{{ url_for('serve_song_processing_file', filename=fingerprint_result.scatter_plot_path | basename) }}" alt="Spectral Peaks" class="scatter-plot-img">
+                    </div>
+                </div>
+            {% endif %}
+            {% if fingerprint_result.chromagram_path %}
+                <div class="visualization-card">
+                    <h4>Chromagram</h4>
+                    <div class="chromagram-container">
+                        <img src="{{ url_for('serve_song_processing_file', filename=fingerprint_result.chromagram_path | basename) }}" alt="Chromagram" class="chromagram-img">
+                    </div>
+                </div>
+            {% endif %}
+            {% if fingerprint_result.mfcc_path %}
+                <div class="visualization-card">
+                    <h4>MFCC</h4>
+                    <div class="mfcc-container">
+                        <img src="{{ url_for('serve_song_processing_file', filename=fingerprint_result.mfcc_path | basename) }}" alt="MFCC" class="mfcc-img">
+                    </div>
+                </div>
+            {% endif %}
+        </div>
         <p><strong>Normality Test:</strong> Check logs for Shapiro-Wilk test results (p-value). If p < 0.05, percentile threshold was used; otherwise, adaptive threshold based on normal distribution.</p>
     {% endif %}
 
@@ -140,12 +175,13 @@
             border-radius: 5px;
             margin-bottom: 20px;
         }
-        .results-grid {
+        .results-grid, .visualizations-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
+            margin-bottom: 20px;
         }
-        .result-card {
+        .result-card, .visualization-card {
             border: 1px solid #ddd;
             padding: 15px;
             border-radius: 5px;
@@ -154,14 +190,14 @@
             width: 100%;
             margin: 10px 0;
         }
-        .scatter-plot-container, .spectrogram-container {
+        .scatter-plot-container, .spectrogram-container, .chromagram-container, .mfcc-container {
             overflow-x: auto;
             max-width: 100%;
             border: 1px solid #ddd;
             padding: 10px;
             margin: 10px 0;
         }
-        .scatter-plot-svg, .spectrogram-img {
+        .scatter-plot-img, .spectrogram-img, .chromagram-img, .mfcc-img {
             max-width: 100%;
             height: auto;
             display: block;
@@ -181,10 +217,17 @@
             font-weight: bold;
         }
         table {
+            width: 100%;
+            border-collapse: collapse;
             margin-top: 20px;
         }
         th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
             text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
         }
     </style>
 {% endblock %}
