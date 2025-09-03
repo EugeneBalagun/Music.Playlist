@@ -21,6 +21,12 @@ Supports **user authentication**, playlist management, song ratings, notes, and 
 - **Database:** Users, playlists, songs, fingerprints, comparisons (**SQLite**)
 
 ---
+## 📸 Screenshots
+
+| ![Screen1](screens/screen1.png) | ![Screen2](screens/screen2.png) | ![Screen3](screens/screen3.png) |
+|---------------------------------|---------------------------------|---------------------------------|
+| ![Screen4](screens/screen4.png) | ![Screen5](screens/screen5.png) | ![Screen6](screens/screen6.png) |
+
 
 ## ⚙️ Requirements
 
