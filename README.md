@@ -125,17 +125,6 @@ gunicorn -w 4 app:app
 
 ---
 
-### 🗂️ Directory Structure
-music-playlist-manager/
-├── app.py
-├── downloads/ # downloaded MP3s
-├── analysis/ # analysis reports, spectrograms
-├── tempo_shifted/ # shifted MP3s & spectrograms
-├── fingerprints/ # PKL fingerprints & visualizations
-├── users.db # SQLite DB
-├── migrations/ # Flask-Migrate files
-└── templates/ # HTML templates
-
 
 ### 🛠️ Troubleshooting
 
