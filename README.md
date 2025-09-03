@@ -107,39 +107,43 @@ Runs on http://localhost:5000
 For production, use a WSGI server like Gunicorn:
 gunicorn -w 4 app:app
 
-📝 Usage
+### 📝 Usage
 
-Register / Login: Create an account
-Spotify Authorization: Login with Spotify to enable imports
-Create Playlists: Add manually or import from Spotify
-Add Songs: From Spotify URL or full playlists/albums
-Download Songs: Requires Spotify auth; downloads from YouTube
-Analyze Songs: Generates tempo, spectral features, MFCC, onsets, RMS, spectrograms
-Fingerprint Songs: For similarity comparison
-Compare Songs: Visualize similarity between songs
-Tempo Shift: Adjust tempo with pitch correction
-Charts & Player: View playlist stats and play songs
-Logout from home page
+- **Register / Login:** Create an account  
+- **Spotify Authorization:** Login with Spotify to enable imports  
+- **Create Playlists:** Add manually or import from Spotify  
+- **Add Songs:** From Spotify URL or full playlists/albums  
+- **Download Songs:** Requires Spotify auth; downloads from YouTube  
+- **Analyze Songs:** Generates tempo, spectral features, MFCC, onsets, RMS, spectrograms  
+- **Fingerprint Songs:** For similarity comparison  
+- **Compare Songs:** Visualize similarity between songs  
+- **Tempo Shift:** Adjust tempo with pitch correction  
+- **Charts & Player:** View playlist stats and play songs  
+- **Logout:** From home page  
+
 ⚠️ Note: YouTube search results may vary. Ensure legal usage. Audio processing may be CPU/RAM intensive.
 
-🗂️ Directory Structure
+---
+
+### 🗂️ Directory Structure
 music-playlist-manager/
 ├── app.py
-├── downloads/        # downloaded MP3s
-├── analysis/         # analysis reports, spectrograms
-├── tempo_shifted/    # shifted MP3s & spectrograms
-├── fingerprints/     # PKL fingerprints & visualizations
-├── users.db          # SQLite DB
-├── migrations/       # Flask-Migrate files
-└── templates/        # HTML templates
+├── downloads/ # downloaded MP3s
+├── analysis/ # analysis reports, spectrograms
+├── tempo_shifted/ # shifted MP3s & spectrograms
+├── fingerprints/ # PKL fingerprints & visualizations
+├── users.db # SQLite DB
+├── migrations/ # Flask-Migrate files
+└── templates/ # HTML templates
 
 
-🛠️ Troubleshooting
-Spotify Errors: Check API keys & redirect URI
-Download Failures: Verify yt-dlp version and YouTube access
-Audio Errors: Install FFmpeg; check file paths
-Database Issues: Delete users.db and restart
-Logging: Check DEBUG console logs
+### 🛠️ Troubleshooting
+
+- **Spotify Errors:** Check API keys & redirect URI  
+- **Download Failures:** Verify yt-dlp version and YouTube access  
+- **Audio Errors:** Install FFmpeg; check file paths  
+- **Database Issues:** Delete `users.db` and restart  
+- **Logging:** Check DEBUG console logs
 
 🤝 Contributing
 Fork the repo, make changes, and submit a pull request. Focus on security (move keys to env vars) or features (more analysis metrics).
